@@ -9,7 +9,7 @@
 Этот код стоит прошивать на ESP с настройками MMU "16KB cache + 48KB IRAM and 2nd HEAP (shared)". Настрока прошивки в Arduino IDE находится сверху слева, во вкладке Tools.
 
 Settings > Stack Protection Enable 
-
+\n\n
 
 
 
