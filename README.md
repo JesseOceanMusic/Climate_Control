@@ -11,6 +11,8 @@
 Settings > Stack Protection Enable 
 
 
+
+
 // ↓↓↓ Версии Библиотек ↓↓↓ //
 
 // NTPClient                3.2.1
@@ -40,6 +42,8 @@ Settings > Stack Protection Enable
 // Sensirion I2C SCD 4x     0.4.0
 
 // UniversalTelegramBot     1.3.0    ! Читать "ВАЖНО" выше !
+
+
 
 
 // ↓↓↓ Используемые компоненты на 2024-09-18 ↓↓↓ //
