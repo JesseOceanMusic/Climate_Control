@@ -119,12 +119,12 @@ class class_users
 
 class_users object_array_users[6] =
 {
-  class_users(0, "USER_ID0",      true,  true,  false, "Андрей"),                        // Мой айди //
-  class_users(1, "USER_ID1", false, false, false, "Катя - группа"),                      // Катя - айди группы //
-  class_users(2, "USER_ID2",      false, false, true,  "Катя - личная переписка"),       // Катя - личный айди //
-  class_users(3, "USER_ID3", false, false, false, "Саша - группа"),                      // Саша - айди группы //
-  class_users(4, "USER_ID4", false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
-  class_users(5, "USER_ID5", false, false, true,  "Гостевой чат"),                       // гостевой юзер //
+  class_users(0, USER_ID0, true,  true,  false, "Андрей"),                             // Мой айди //
+  class_users(1, USER_ID1, false, false, false, "Катя - группа"),                      // Катя - айди группы //
+  class_users(2, USER_ID2, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
+  class_users(3, USER_ID3, false, false, false, "Саша - группа"),                      // Саша - айди группы //
+  class_users(4, USER_ID4, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
+  class_users(5, USER_ID5, false, false, true,  "Гостевой чат"),                       // гостевой юзер //
 };
 
 void class_users::send_message(String input)
@@ -321,7 +321,7 @@ bool flag_every_minute_timer = false;            // флаг для таймер
 /// ↓↓↓ ДЛЯ СИНХРОНИЗАЦИИ ОШИБОК ↓↓↓ ///
 
 
-int ErrorSTATEmy = 1;                            // Флаг для ошибок (1 - нет ошибок, 2 - в цикле были ошибки) // ps в какой-то момент появилось подозрение, что где-то в биоблетаках уже есть ErrorSTATE и возникают ошибки //
+bool global_ERROR_flag = false;                          // Флаг для ошибок (1 - нет ошибок, 2 - в цикле были ошибки) // ps в какой-то момент появилось подозрение, что где-то в биоблетаках уже есть ErrorSTATE и возникают ошибки //
 
 
 /// ↓↓↓ ДАТЧИКИ ТЕМПЕРАТУРЫ ↓↓↓ ///
@@ -414,7 +414,7 @@ class class_ds18b20                              // класс датчиков 
       if (_crit_temp_low_alert > _temp)
       {
         send_alert("ALERT: " + _name + String(_temp) + "°C");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
     }
 
@@ -423,62 +423,380 @@ class class_ds18b20                              // класс датчиков 
       if (_crit_temp_low_error > _temp || _temp > _crit_temp_high_error)
       {
         send_alert("ERROR: " + _name + String(_temp) + "°C");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
     }
 
 };
 
-class_ds18b20 object_ds18b20_0(true, 0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43, "Рекуператор Приток (in): ");
+class_ds18b20 object_ds18b20_0(true, 0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43,  "Рекуператор Приток (in): ");
 class_ds18b20 object_ds18b20_1(false, 0x28, 0x5C, 0x4E, 0x3C, 0x0, 0x0, 0x0, 0x5C, "Рекуператор Приток (out): ");
 class_ds18b20 object_ds18b20_2(false, 0x28, 0xAD, 0x18, 0x3A, 0x0, 0x0, 0x0, 0x19, "Рекуператор Вытяжка (in): ");
-class_ds18b20 object_ds18b20_3(true, 0x28, 0x27, 0xB5, 0x3E, 0x0, 0x0, 0x0, 0xED, "Рекуператор Вытяжка (out): ");
+class_ds18b20 object_ds18b20_3(true, 0x28, 0x27, 0xB5, 0x3E, 0x0, 0x0, 0x0, 0xED,  "Рекуператор Вытяжка (out): ");
 class_ds18b20 object_ds18b20_4(false, 0x28, 0xB6, 0x76, 0x39, 0x0, 0x0, 0x0, 0x81, "c Улицы: ");
-class_ds18b20 object_ds18b20_5(false, 0x28, 0xF, 0x2A, 0x3A, 0x0, 0x0, 0x0, 0x2C, "с Батареи: ");
+class_ds18b20 object_ds18b20_5(false, 0x28, 0xF, 0x2A, 0x3A, 0x0, 0x0, 0x0, 0x2C,  "с Батареи: ");
 class_ds18b20 object_ds18b20_6(false, 0x28, 0x5E, 0x81, 0x39, 0x0, 0x0, 0x0, 0xFE, "Объединенный поток: ");
 
 
 /// ↓↓↓ УПРАВЛЕНИЕ ЗАСЛОНКАМИ ↓↓↓ ///
 
 
-#define street_STEP D6                           // пин для управления шагами двигателя заслонки с улицы //
-#define home_STEP D7                             // пин для управления шагами двигателя заслонки от батареи //
-#define DIR D8                                   // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
-#define dir_UP LOW                               // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
-#define dir_DOWN HIGH                            // ↑↑↑ //
-
 float TempMain = 4.00;                           // температура термостата //
 float TempRange = 2.00;                          // чувствительность термостата //
 int Step_Per_loop = 80;                          // количество шагов двигателя за цикл запуска термостата //
-
 int AirLowLimit = 25;                            // минимальный процент воздуха с улицы //
 
-#define pinKnobLow D3                            // нижние концевики  //
-#define pinKnobHigh D4                           // верхние концевики //
+#define dir_UP LOW                     // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
+#define dir_DOWN HIGH                  // ↑↑↑ //
 
-const int KNOB_space = 110;                            // обратный отступ после срабатывания концевика //
+const byte pin_step_SREET = 12;    //D6              // пин для управления шагами двигателя заслонки с улицы //
+const byte pin_step_HOME = 13;     //D7               // пин для управления шагами двигателя заслонки от батареи //
+const byte pin_DIR = 15;           //D8                     // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
+const byte pin_knob_LOW = 0;      //D3                // нижние концевики  //
+const byte pin_knob_HIGH = 2;     //D4               // верхние концевики //
 
-int StepsGLOBAL = 3188;                          // одна переменная для определения положения ОБЕИХ заслонок // StepsGLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
 
-const int street_POSITION_low_const = -2912;                    // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
-const int home_POSITION_low_const = 3188;                       // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
+byte calibrate_state;
+const int street_LOWEST_position_const = -2912;                    // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
+const int home_LOWEST_position_const = 3188;                       // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
-int street_POSITION_low_cur = street_POSITION_low_const;        // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
-int home_POSITION_low_cur = home_POSITION_low_const;            // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
+int street_LOWEST_position_cur = street_LOWEST_position_const;     // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
+int home_LOWEST_position_cur = home_LOWEST_position_const;         // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
 
-int street_POSITION_low_manual = street_POSITION_low_const;     // переменная для возможности выставления нижней границы с УЛИЦЫ вручную //
-int home_POSITION_low_manual = home_POSITION_low_const;         // переменная для возможности выставления нижней границы от БАТАРЕИ вручную //
+class class_motor
+{
+  public:
+    class_motor(byte pin_step)
+    {
+      _pin_step = pin_step;
+    }
 
-long doXsteps_counter = 0;                       // счетчик количества шагов сделанных за день //
+    void do_8_microsteps()
+    {
+      for (int i = 0; i < 8; i++)
+      {
+        digitalWrite(_pin_step, HIGH);
+        delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
+        digitalWrite(_pin_step, LOW);
+        delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
+      }
+    }
 
-int stepsAmount;                                 // количество шагов для функции doXsteps_func //
+  protected:
+    byte _pin_step;
+};
 
-int steps_counter_limit4000;                     // счетчик шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-bool step_counter_Flag = 1;                      // флаг таймера для отправки отчета по количеству пройденных шагов за сутки // Нужно, чтобы быстро понять, не делают ли заслонки лишних движений летом //
+class class_motor_plus_knobs : public class_motor
+{
+  public:
+    class_motor_plus_knobs(byte pin_step) : class_motor(pin_step)
+    {
+    }
 
-int calibrate_state;                             // стейт калибровки заслонок // 0 - калибровка не нужна, 1 - полноценная калибровка, 2 - быстрая калибровка //
-bool calibrate_ERROR = 0;                        // 0 - нет ошибок, 1 - ошибка при калибровки - двигатель сделал больше шагов, чем должен был и всё-равно не дошел до концевика. Либо сломан концевик, либо есть пропуск шагов. // Может сработать только при калибровке //
-bool daily_calibrate_flag = 0;                   // флаг для таймера автоматической калибровки раз в сутки // стоит 0, чтобы если включить ардуино с 14 до 19 - не сработало две калибровки подряд (1 раз при включени и еще одна по таймеру) //
+    bool go_to_HIGH_limit()                       // Калибровка заслонки с улицы верхнее положение //
+    {
+      int steps_counter_limit4000 = 4000;                                      // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
+      digitalWrite(pin_DIR, dir_UP);
+      while (digitalRead(pin_knob_HIGH) == 1 && steps_counter_limit4000 > 0)  // Идём вверх пока не сработает кнопка //
+      {
+        do_8_microsteps();
+      }
+
+      digitalWrite(pin_DIR, dir_DOWN);
+      for (int i = 0; i < _knob_space; i++)                                    // Отступаем обратно //
+      {
+        do_8_microsteps();
+      }
+
+      return(_check_limit4000(steps_counter_limit4000));
+    }
+
+    bool set_LOW_limit()                        // Калибровка заслонки с улицы нижнее положение //
+    {
+      _LOWEST_position = 0;
+      int steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
+      
+      digitalWrite(pin_DIR, dir_DOWN);
+      while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)         // Идём вниз пока не сработает кнопка //
+      {
+        do_8_microsteps();
+        _LOWEST_position++;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+        steps_counter_limit4000--;
+      }
+
+      digitalWrite(pin_DIR, dir_UP);
+      for (int i = 0; i < _knob_space; i++)                                    // Отступаем обратно //
+      {
+        do_8_microsteps();
+        _LOWEST_position--;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+      }
+
+      return(_check_limit4000(steps_counter_limit4000));
+    }
+
+    int get_LOWEST_position()
+    {
+      return(_LOWEST_position);
+    }
+
+  private:
+    const byte _knob_space = 110;
+
+    int _LOWEST_position;
+
+    bool _check_limit4000(int steps_counter_limit4000)
+    {
+      if (steps_counter_limit4000 <= 0)
+      {
+        global_ERROR_flag = true;
+        send_alert("!!!FATAL_ERROR!!!_From_Chat: Заклинил двигатель или не работают концевики.");
+        return (true);
+      }
+      return(false);
+    }
+};
+
+class_motor_plus_knobs object_STREET_motor_plus_knobs(pin_step_SREET);
+class_motor_plus_knobs object_HOME_motor_plus_knobs  (pin_step_HOME);
+
+
+
+class class_motor_main
+{
+  public:
+
+    class_motor_main()
+    {
+    }
+
+    void doXsteps_func(int steps_amount)
+    {
+      if (_calibrate_ERROR == true)
+      {
+        global_ERROR_flag = true;
+        send_alert("ERROR: Управление заслонками невозможно - заклинил двигатель или не работают концевики.");
+        return;
+      }
+
+      if (steps_amount < 0)                                                                                // отрицательные значения открываем батарею, закрываем улицу //
+      {
+        digitalWrite(pin_DIR, dir_UP);
+        while (steps_amount < 0 && _steps_GLOBAL > 0 && digitalRead(pin_knob_HIGH) == 1)                           // открываем батарею // от 0 вверх - "батарея", от 0 вниз = "улица" //
+        {
+          object_HOME_motor_plus_knobs.do_8_microsteps();
+          _doXsteps_counter++;
+          _steps_GLOBAL--;
+          steps_amount++;
+        }
+        
+        digitalWrite(pin_DIR, dir_DOWN);
+        while (steps_amount < 0 && _steps_GLOBAL > street_LOWEST_position_cur && digitalRead(pin_knob_LOW) == 1)  // закрываем улицу // от 0 вверх - "батарея", от 0 вниз = "улица" //
+        {
+          object_STREET_motor_plus_knobs.do_8_microsteps();
+          _doXsteps_counter++;
+          _steps_GLOBAL--;
+          steps_amount++;
+        }
+      }
+
+      if (steps_amount > 0)                                                                                // положительные значения открываем улицу, закрываем батарею //
+      {
+        digitalWrite(pin_DIR, dir_UP);
+        while (steps_amount > 0 && _steps_GLOBAL < 0 && digitalRead(pin_knob_HIGH) == 1)                           // открываем улицу // от 0 вверх - "батарея", от 0 вниз = "улица" //
+        {
+          object_STREET_motor_plus_knobs.do_8_microsteps();
+          _doXsteps_counter++;
+          _steps_GLOBAL++;
+          steps_amount--;
+        }
+
+        digitalWrite(pin_DIR, dir_DOWN);
+        while (steps_amount > 0 && _steps_GLOBAL < home_LOWEST_position_cur && digitalRead(pin_knob_LOW) == 1)     // закрываем батарею // от 0 вверх - "батарея", от 0 вниз = "улица" //
+        {
+          object_HOME_motor_plus_knobs.do_8_microsteps();
+          _doXsteps_counter++;
+          _steps_GLOBAL++;
+          steps_amount--;
+        }
+      }
+
+      if(digitalRead(pin_knob_HIGH) == 0 || digitalRead(pin_knob_LOW) == 0)                                          //Отправляем ошибку, если коснулись кнопки (не должны) //
+      {
+        send_alert("ERROR: Сработал концевик на заслонке.");
+        calibrate_state = 1;
+        global_ERROR_flag = true;
+      }
+    }
+
+    void calibrate_test()                            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
+    {
+      int buf_steps_GLOBAL = _steps_GLOBAL;
+
+      if(calibrate_state == 2 && _calibrate_ERROR == false)                      // быстрая калибровка //
+      {
+        object_array_users[0].send_message_second_chat("Начинаю процесс быстрой калибровки.");
+
+        if(digitalRead(pin_knob_LOW) == 1 && digitalRead(pin_knob_HIGH) == 1)
+        {
+          _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+          _calibrate_ERROR = object_HOME_motor_plus_knobs.set_LOW_limit();
+
+          _steps_GLOBAL = home_LOWEST_position_cur;
+          object_array_users[0].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(_steps_GLOBAL));
+        }
+        
+        else
+        {
+          send_alert("Быстрая калибровка невозможна. Концевик нажат.");
+          calibrate_state = 1;
+        }
+      }
+
+      if(calibrate_state == 1 && _calibrate_ERROR == false)                        // полноценная калибровка //
+      {
+        object_array_users[0].send_message_second_chat("Начинаю процесс полноценной калибровки.");
+
+        for(int i = 0; i < 2; i++)                                             // Запускаем по два раза, чтобы отступить KNOB_space*2 //
+        {
+          if(_calibrate_ERROR == false)
+          {
+            _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+          } 
+        }
+
+        for(int i = 0; i < 2; i++)                                             // Запускаем по два раза, чтобы отступить KNOB_space*2 //
+        {
+          if (_calibrate_ERROR == false)
+          {
+            _calibrate_ERROR = object_HOME_motor_plus_knobs.go_to_HIGH_limit();
+          } 
+        }
+
+        if (_calibrate_ERROR == false)
+        {
+          _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();  // Производим калибровку второй раз на случай, если была зажата противоположенный концевик! //
+          object_array_users[0].send_message_second_chat("Верхнее положение заслонки с улицы откалибровано.");
+        }
+
+        if (_calibrate_ERROR == false)
+        {
+          _calibrate_ERROR = object_HOME_motor_plus_knobs.go_to_HIGH_limit();    // Производим калибровку второй раз на случай, если была зажата противоположенный концевик! //
+          object_array_users[0].send_message_second_chat("Верхнее положение заслонки от батареи откалибровано.");
+        }
+        
+
+        if (_calibrate_ERROR == false)                                              // калибровка нижнего положения STREET //
+        {
+          _calibrate_ERROR = object_STREET_motor_plus_knobs.set_LOW_limit();
+
+          street_LOWEST_position_cur = object_STREET_motor_plus_knobs.get_LOWEST_position();
+
+          int cal_dif1 = street_LOWEST_position_const - street_LOWEST_position_cur;
+          object_array_users[0].send_message_second_chat("Нижнее положожение заслонки с улицы откалибровано. Результат: " + String(street_LOWEST_position_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif1));
+
+          _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();          // открываем заслонку обратно //
+
+          object_array_users[0].send_message_second_chat("Положение заслонки с улицы возвращено в открытое положение. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
+        }
+
+        if (_calibrate_ERROR == false)                                              // калибровка нижнего положения HOME //
+        {
+          _calibrate_ERROR = object_HOME_motor_plus_knobs.set_LOW_limit();
+
+          home_LOWEST_position_cur = object_HOME_motor_plus_knobs.get_LOWEST_position();
+
+          _steps_GLOBAL = home_LOWEST_position_cur;
+
+          int cal_dif2 = home_LOWEST_position_const - home_LOWEST_position_cur;
+          object_array_users[0].send_message_second_chat("Нижнее положожение заслонки от батареи откалибровано. Результат: " + String(home_LOWEST_position_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif2));
+        }
+      }
+
+      if (calibrate_state == 1 || calibrate_state == 2)                        // завершающий процесс любой калибровки //
+      {
+        if (_calibrate_ERROR == false)                                              // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
+        {
+          int buf_steps_amount = buf_steps_GLOBAL - _steps_GLOBAL;
+          _doXsteps_counter = _doXsteps_counter + buf_steps_amount;              // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
+          doXsteps_func(buf_steps_amount);
+          calibrate_state = 0;
+          object_array_users[0].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
+        }
+        if (_calibrate_ERROR == true)                                              // если есть ошибки - отправляем уведомление о невозможности калибровки //
+        {
+          global_ERROR_flag = true;
+          send_alert("ERROR: Калибровка невозможна - заклинил двигатель или не работают концевики.");
+        }
+      }
+
+      if (_daily_calibrate_flag == true && object_TimeDate.get_TimeB() > 140101 && object_TimeDate.get_TimeB() < 142929)      // автоматическая калибровка раз в сутки в 14:01 //
+      {
+        calibrate_state = 2;
+        _daily_calibrate_flag = false;
+        object_array_users[0].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 14:00 до 14:30).");
+      }
+
+      if (_daily_calibrate_flag == false)                                                                // поднимаем флаг калибровки //
+      {
+        if (object_TimeDate.get_TimeB() < 135959 || object_TimeDate.get_TimeB() > 143131)
+        {
+          _daily_calibrate_flag = true;
+        }
+      }
+
+      if (_step_counter_Flag == 1 && object_TimeDate.get_TimeB() > 234500)   // отправка отчета по количеству пройденых шагов за день //
+      {
+        _step_counter_Flag = 0;
+        object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter));
+        _doXsteps_counter = 0;
+      }
+
+      if (_step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)   // возвращает влаг обратно, чтобы отчет отправился на следующий день //
+      {
+        _step_counter_Flag = 1;
+      }
+    }
+
+    String getMotorPositions()                         // создает стринг с текстовым описанием положения заслонок как в абсолютном значении, так и в процентах //
+    {
+      int position_street = 0;
+      int position_home = 0;
+
+      if (_steps_GLOBAL < 0) {
+        position_street = map(_steps_GLOBAL, 0, street_LOWEST_position_cur, 0, 100);
+      }
+      if (_steps_GLOBAL > 0) {
+        position_home = map(_steps_GLOBAL, 0, home_LOWEST_position_cur, 0, 100);
+      }
+
+      String Message_Motor_Positions = "\n\nКрайнее нижнее положение заслонки от батареи: " + String(home_LOWEST_position_const) +\
+                                      "\nТекущее положение заслонок(_steps_GLOBAL*): " + String(_steps_GLOBAL) +\
+                                      "\nКрайнее нижнее положение заслонки с улицы: " + String(street_LOWEST_position_cur) +\
+                                      "\n\n*Заслонка с улицы закрыта на " + String(position_street) +\
+                                      "%.\n*Заслонка от батареи закрыта на " + String(position_home) +\
+                                      "%.\n\n**Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter);
+
+      return (Message_Motor_Positions);
+    }
+
+    int get_steps_GLOBAL()
+    {
+      return(_steps_GLOBAL);
+    }
+
+    long get_doXsteps_counter()
+    {
+      return(_steps_GLOBAL);
+    }
+  private:
+    bool _calibrate_ERROR;
+    bool _daily_calibrate_flag = false;               // флаг для таймера автоматической калибровки раз в сутки // стоит false, чтобы если включить ESP с 14 до 19 - не сработало две калибровки подряд (1 раз при включени и еще одна по таймеру) //
+    bool _step_counter_Flag = 1;                      // флаг таймера для отправки отчета по количеству пройденных шагов за сутки // Нужно, чтобы быстро понять, не делают ли заслонки лишних движений летом //
+    long _doXsteps_counter = 0;                       // счетчик количества шагов сделанных за день //
+    int _steps_GLOBAL = 3188;                         // одна переменная для определения положения ОБЕИХ заслонок // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+};
+
+class_motor_main object_motor_main;
 
 
 /// ↓↓↓ ДАТЧИК ТЕМПЕРАТУРЫ И ВЛАЖНОСТИ SHT41 + Реле ↓↓↓ ///
@@ -563,13 +881,13 @@ class SHT41                                      // класс датчика SH
       if ((10 > int(_temp)) || (int(_temp) > _crit_temp_high_error))                         // Если датчик SHT41 отключен от питание значение будет 0 //
       {
         send_alert("ERROR Температура в комнате: " + String(_temp) + "°C");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
 
       if ((_humidity_low_alert > int(_humidity)) || (int(_humidity) > _humidity_high_alert))  // Если датчик SHT41 отключен от питание значение будет 0 //
       {
         send_alert("ERROR Влажность в комнате: " + String(_humidity) + "%");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
     }
 };
@@ -603,7 +921,7 @@ class SCD41                                      // класс датчика С
       if (error_co2)
       {
         send_alert("ERROR: Не смог остановить переодическое измерение датчика со2 перед запуском.");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
       else
       {
@@ -614,7 +932,7 @@ class SCD41                                      // класс датчика С
       if (error_co2)
       {
         send_alert("ERROR: Не смог установить Altitude (высоту над уровнем моря) в датчике со2.");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
       else
       {
@@ -625,7 +943,7 @@ class SCD41                                      // класс датчика С
       if (error_co2)
       {
         send_alert("ERROR: Не смог запустить переодическое измерение датчика со2.");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
       else
       {
@@ -649,7 +967,7 @@ class SCD41                                      // класс датчика С
         {
           send_alert("ERROR: не смог получить показания со2.");
           _CO2 = 0;
-          ErrorSTATEmy = 2;
+          global_ERROR_flag = true;
         }
 
         _check_errors();
@@ -686,7 +1004,7 @@ class SCD41                                      // класс датчика С
       if (_CO2 < 200)
       {
         send_alert("ERROR уровень со2: " + String(_CO2) + "ppm" + "\n\n\n Если ошибка повторяется - попробуйте перезапуск /35101@JOArduinoChatBOT");
-        ErrorSTATEmy = 2;
+        global_ERROR_flag = true;
       }
     }
 
@@ -714,12 +1032,12 @@ void setup()                                     // стандартная фу�
 
   object_TimeDate.set_UTC_time();
 
-  pinMode(pinKnobLow, INPUT_PULLUP);             // определяем пины // нижние концевики //
-  pinMode(pinKnobHigh, INPUT_PULLUP);            // ↑↑↑ // верхние концевики //
+  pinMode(pin_knob_LOW, INPUT_PULLUP);             // определяем пины // нижние концевики //
+  pinMode(pin_knob_HIGH, INPUT_PULLUP);            // ↑↑↑ // верхние концевики //
 
-  pinMode(street_STEP, OUTPUT);                  // ↑↑↑ // шаговый двигатель заслонки с улицы //
-  pinMode(home_STEP, OUTPUT);                    // ↑↑↑ // шаговый двигатель заслонки от батареи //
-  pinMode(DIR, OUTPUT);                          // ↑↑↑ // общий пин direction (направление вращения двигателей) //
+  pinMode(pin_step_SREET, OUTPUT);                  // ↑↑↑ // шаговый двигатель заслонки с улицы //
+  pinMode(pin_step_HOME, OUTPUT);                    // ↑↑↑ // шаговый двигатель заслонки от батареи //
+  pinMode(pin_DIR, OUTPUT);                          // ↑↑↑ // общий пин direction (направление вращения двигателей) //
 
   pinMode(relay, OUTPUT);                        // определяем пин реле, как output //
   digitalWrite(relay, LOW);                      // на всякий случай выключаем реле при запуске //
@@ -729,16 +1047,17 @@ void setup()                                     // стандартная фу�
   if (!sht4.begin())                             // инициализация адафрут датчика по шине i2c //
   {
     send_alert("ERROR: Ошибка инициализации датчика температуры и влажности.");
-    ErrorSTATEmy = 2;
+    global_ERROR_flag = true;
   }
   sht4.setPrecision(SHT4X_HIGH_PRECISION);       // Какие-то настройки в адафрут библиотеке отвечающие за точность //
   sht4.setHeater(SHT4X_NO_HEATER);               // Какие-то настройки в адафрут библиотеке отвечающие за "прогрев". Видимо, это необходимо при использование датчика в экстремальных температурах, хз. По умолчанию выключено. //
 
   scd4x.begin(Wire);                             // инициализация датчика СО2 по шине i2c //
 
-  send_alert("Я проснулся.");
   calibrate_state = 2;
-  object_array_users[0].send_message("Отправил запрос на быструю калибровку после включения.");
+  object_motor_main.calibrate_test();
+  
+  send_alert("Я проснулся.");
 }
 
 void loop()                                      // основной луп //
@@ -756,7 +1075,7 @@ void loop()                                      // основной луп //
     Message_from_Telegram_converter();
   }
 
-  if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)                 // таймер каждую нечетную минуту //
+  if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)              // таймер каждую нечетную минуту //
   {
     update_sensors_data_and_calculations();                      
 
@@ -768,9 +1087,9 @@ void loop()                                      // основной луп //
     flag_every_minute_timer = true;
   }
 
-  if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)                 // таймер каждую четную минуту //
+  if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)              // таймер каждую четную минуту //
   {
-    calibrate_test();                                                     // проверяет нужна ли калибровка //
+    object_motor_main.calibrate_test();                                                  // проверяет нужна ли калибровка //
     flag_every_minute_timer = false;
   }
 }
@@ -867,7 +1186,7 @@ void Message_command_executer(String text)       // обработчик ком�
       case 107:                                // установка шага заслонок //
       {
         Step_Per_loop = constrain(text.toInt(), 10, 1000);  // Ограничивает диапазон возможных значений //
-        float calculation_buf = (home_POSITION_low_manual - street_POSITION_low_manual) / Step_Per_loop;
+        float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
         int calculation_buf2 = int(calculation_buf) * 2;
 
         String buf = "Шаг изменения положения заслонок: " + String(Step_Per_loop) +\
@@ -878,34 +1197,33 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 108:                                // ручное управление заслонками //
       {
-        stepsAmount = constrain(text.toInt(), -10000, 10000);
-        object_array_users[users_array_index].send_message("Принял количество шагов: " + String(stepsAmount));
+        int buf_steps_amount = constrain(text.toInt(), -10000, 10000);
+        object_array_users[users_array_index].send_message("Принял количество шагов: " + String(buf_steps_amount));
 
-        doXsteps_func();
-        object_array_users[users_array_index].send_message(getMotorPositions());
+        object_motor_main.doXsteps_func(buf_steps_amount);
+        object_array_users[users_array_index].send_message(object_motor_main.getMotorPositions());
         break;  
       }
 
       case 111:                               // ручная установка крайнего нижнего положения заслонки с улицы //
       {
-        street_POSITION_low_manual = constrain(text.toInt(), street_POSITION_low_const, 0);
-        if (StepsGLOBAL < street_POSITION_low_manual)
+        street_LOWEST_position_cur = constrain(text.toInt(), street_LOWEST_position_const, 0);
+        if (object_motor_main.get_steps_GLOBAL() < street_LOWEST_position_cur)
         {
-          stepsAmount = street_POSITION_low_manual - StepsGLOBAL;
+          object_motor_main.doXsteps_func(street_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
         }
-        doXsteps_func();
-        object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки с улицы: " + String(street_POSITION_low_manual));
+        object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки с улицы: " + String(street_LOWEST_position_cur));
         break;  
       }
 
       case 112:                               // ручная установка крайнего нижнего положения заслонки от батареи //
       {
-        home_POSITION_low_manual = constrain(text.toInt(), 0, home_POSITION_low_const);
-        if (StepsGLOBAL > home_POSITION_low_manual) {
-          stepsAmount = home_POSITION_low_manual - StepsGLOBAL;
+        home_LOWEST_position_cur = constrain(text.toInt(), 0, home_LOWEST_position_const);
+        if (object_motor_main.get_steps_GLOBAL() > home_LOWEST_position_cur)
+        {
+          object_motor_main.doXsteps_func(home_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
         }
-        doXsteps_func();
-        object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки от батареи: " + String(home_POSITION_low_manual));
+        object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки от батареи: " + String(home_LOWEST_position_cur));
         break;  
       }
 
@@ -965,7 +1283,7 @@ void Message_command_executer(String text)       // обработчик ком�
       case 101:                              // текущие температуры в текстовом виде //
       {
         update_sensors_data_and_calculations();
-        object_array_users[users_array_index].send_message(TEMP_text_output() + "\n\n\n\n↓↓↓ЗАСЛОНКИ↓↓↓" + getMotorPositions());
+        object_array_users[users_array_index].send_message(TEMP_text_output() + "\n\n\n\n↓↓↓ЗАСЛОНКИ↓↓↓" + object_motor_main.getMotorPositions());
         break;
       }
       
@@ -1041,7 +1359,7 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 107:                              // установка шага заслонок //
       {
-        float calculation_buf = (home_POSITION_low_manual - street_POSITION_low_manual) / Step_Per_loop;
+        float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
         int calculation_buf2 = int(calculation_buf) * 2;
 
         String buf = "Отправьте сообщение для установки шага изменения положения заслонок (от 10 до 1000):\n\nТекущее значение: " + String(Step_Per_loop) +\
@@ -1053,7 +1371,7 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 108:                              // ручное управление заслонками //
       {
-        object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + getMotorPositions());
+        object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + object_motor_main.getMotorPositions());
         object_array_users[users_array_index].set_message_state(108);
         break;
       }
@@ -1062,6 +1380,7 @@ void Message_command_executer(String text)       // обработчик ком�
       {
         calibrate_state = 2;
         object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
+        object_motor_main.calibrate_test();
         break;
       }
 
@@ -1076,7 +1395,8 @@ void Message_command_executer(String text)       // обработчик ком�
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
           calibrate_state = 1;
-          object_array_users[users_array_index].send_message("Отправил запрос на полноценную калибровку.");
+          object_array_users[users_array_index].send_message("Принял запрос на полноценную калибровку.");
+          object_motor_main.calibrate_test();
         }
         else
         {
@@ -1087,8 +1407,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 111:                              // ручная установка крайнего нижнего положения заслонки с улицы //
       {
-        String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки с улицы (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки с улицы после калибровки: " + String(street_POSITION_low_const) +\
-                     "\nЗначение выставленное вручную: " + String(street_POSITION_low_manual);
+        String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки с улицы (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки с улицы после калибровки: " + String(street_LOWEST_position_const) +\
+                     "\nЗначение выставленное вручную: " + String(street_LOWEST_position_cur);
         object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(111);
         break;
@@ -1096,8 +1416,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 112:                              // ручная установка крайнего нижнего положения заслонки от батареи //
       {
-        String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки от батареи (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки от батареи после калибровки: " + String(home_POSITION_low_const) +\
-                     "\nЗначение выставленное вручную: " + String(home_POSITION_low_manual);
+        String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки от батареи (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки от батареи после калибровки: " + String(home_LOWEST_position_const) +\
+                     "\nЗначение выставленное вручную: " + String(home_LOWEST_position_cur);
         object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(112);
         break;
@@ -1288,345 +1608,13 @@ void humidifier()                                // увлажнитель //
 void thermostat()                                // термостат //
 {
   if ((object_ds18b20_0.get_temp() < TempMain - TempRange) && (b61 > AirLowLimit + 5))
-  {
-    stepsAmount = (0 - Step_Per_loop);           // отрицательные значения открываем батарею, закрываем улицу //
-    doXsteps_func();
+  {       
+    object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
   }
 
   if ((object_ds18b20_0.get_temp() > TempMain + TempRange) || (b61 < AirLowLimit - 5))
-  {
-    stepsAmount = Step_Per_loop;                 // положительные значения открываем улицу, закрываем батарею //
-    doXsteps_func();
-  }
-}
-
-String getMotorPositions()                         // создает стринг с текстовым описанием положения заслонок как в абсолютном значении, так и в процентах //
-{
-  int position_street = 0;
-  int position_home = 0;
-
-  if (StepsGLOBAL < 0) {
-    position_street = map(StepsGLOBAL, 0, street_POSITION_low_manual, 0, 100);
-  }
-  if (StepsGLOBAL > 0) {
-    position_home = map(StepsGLOBAL, 0, home_POSITION_low_manual, 0, 100);
-  }
-
-  String Message_Motor_Positions = "\n\nКрайнее нижнее положение заслонки от батареи: " + String(home_POSITION_low_manual) +\
-                                   "\nТекущее положение заслонок(StepsGLOBAL*): " + String(StepsGLOBAL) +\
-                                   "\nКрайнее нижнее положение заслонки с улицы: " + String(street_POSITION_low_manual) +\
-                                   "\n\n*Заслонка с улицы закрыта на " + String(position_street) +\
-                                   "%.\n*Заслонка от батареи закрыта на " + String(position_home) +\
-                                   "%.\n\n**Шагов сделано за сегодня (без учета калибровки): " + String(doXsteps_counter);
-
-  return (Message_Motor_Positions);
-}
-
-void doXsteps_func()                             // меняет положение заслонок. достаточно приравнять глобальную переменную stepsAmount к необходимому количеству шагов и вызвать функцию doXsteps_func //
-{
-  if (calibrate_ERROR == 0) {
-    if (stepsAmount < 0)                                                                                // отрицательные значения открываем батарею, закрываем улицу //
-    {
-      digitalWrite(DIR, dir_UP);
-      while (stepsAmount < 0 && StepsGLOBAL > 0 && digitalRead(pinKnobHigh) == 1)                           // открываем батарею // от 0 вверх - "батарея", от 0 вниз = "улица" //
-      {
-        stepsHOME8();
-        doXsteps_counter++;
-        StepsGLOBAL--;
-        stepsAmount++;
-      }
-      digitalWrite(DIR, dir_DOWN);
-
-      while (stepsAmount < 0 && StepsGLOBAL > street_POSITION_low_manual && digitalRead(pinKnobLow) == 1)  // закрываем улицу // от 0 вверх - "батарея", от 0 вниз = "улица" //
-      {
-        stepsSTREET8();
-        doXsteps_counter++;
-        StepsGLOBAL--;
-        stepsAmount++;
-      }
-    }
-
-    if (stepsAmount > 0)                                                                                // положительные значения открываем улицу, закрываем батарею //
-    {
-      digitalWrite(DIR, dir_UP);
-      while (stepsAmount > 0 && StepsGLOBAL < 0 && digitalRead(pinKnobHigh) == 1)                           // открываем улицу // от 0 вверх - "батарея", от 0 вниз = "улица" //
-      {
-        stepsSTREET8();
-        doXsteps_counter++;
-        StepsGLOBAL++;
-        stepsAmount--;
-      }
-
-      digitalWrite(DIR, dir_DOWN);
-      while (stepsAmount > 0 && StepsGLOBAL < home_POSITION_low_manual && digitalRead(pinKnobLow) == 1)     // закрываем батарею // от 0 вверх - "батарея", от 0 вниз = "улица" //
-      {
-        stepsHOME8();
-        doXsteps_counter++;
-        StepsGLOBAL++;
-        stepsAmount--;
-      }
-    }
-
-    if (digitalRead(pinKnobHigh) == 0 || digitalRead(pinKnobLow) == 0)                                          //Отправляем ошибку, если коснулись кнопки (не должны) //
-    {
-      send_alert("ERROR: Сработал концевик на заслонке.");
-      calibrate_state = 1;
-      ErrorSTATEmy = 2;
-    }
-  }
-
-  else {
-    ErrorSTATEmy = 2;
-    send_alert("ERROR: Управление заслонками невозможно - заклинил двигатель или не работают концевики.");
-  }
-}
-
-void calibrate_test()                            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
-{
-  int StepsGLOBALbuf = StepsGLOBAL;
-
-  if (calibrate_state == 2 && calibrate_ERROR == 0)                       // быстрая калибровка //
-  {
-    object_array_users[0].send_message_second_chat("Начинаю процесс быстрой калибровки.");
-
-    if (digitalRead(pinKnobLow) == 1 && digitalRead(pinKnobHigh) == 1) {
-      set_HIGH_limit_street();
-      calibrate_ERROR_test();
-
-      if (calibrate_ERROR == 0) {
-        steps_counter_limit4000 = 4000;                                   // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-        digitalWrite(DIR, dir_DOWN);
-        while (digitalRead(pinKnobLow) == 1 && steps_counter_limit4000 > 0)   // Идём вниз пока не сработает кнопка //
-        {
-          steps_counter_limit4000--;
-          stepsHOME8();
-        }
-
-        digitalWrite(DIR, dir_UP);
-        for (int i = 0; i < KNOB_space; i++)                              // Отступаем обратно //
-        {
-          stepsHOME8();
-        }
-      }
-      calibrate_ERROR_test();
-      StepsGLOBAL = home_POSITION_low_cur;
-      object_array_users[0].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(StepsGLOBAL));
-    } else {
-      send_alert("Быстрая калибровка невозможна. Концевик нажат.");
-      calibrate_state = 1;
-    }
-  }
-
-  if (calibrate_state == 1 && calibrate_ERROR == 0)                       // полноценная калибровка //
-  {
-    object_array_users[0].send_message_second_chat("Начинаю процесс полноценной калибровки.");
-
-    StepsGLOBAL = 0;                                                      // StepsGLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
-    street_POSITION_low_cur = 0;                                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
-    home_POSITION_low_cur = 0;                                            // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
-
-    long street_POSITION_low_manual = 0;
-    long home_POSITION_low_manual = 0;
-
-    set_HIGH_limit_street();                                              // Запускаем по два раза, чтобы отступить KNOB_space*2 //
-    calibrate_ERROR_test();
-
-    if (calibrate_ERROR == 0) {
-      set_HIGH_limit_street();
-      calibrate_ERROR_test();
-    }
-
-    if (calibrate_ERROR == 0) {
-      set_HIGH_limit_home();                                              // Запускаем по два раза, чтобы отступить KNOB_space*2 //
-      calibrate_ERROR_test();
-    }
-
-    if (calibrate_ERROR == 0) {
-      set_HIGH_limit_home();
-      calibrate_ERROR_test();
-    }
-
-    if (calibrate_ERROR == 0) {
-      set_HIGH_limit_street();                                            // Производим калибровку второй раз на случай, если была зажата противоположенный концевик! //
-      calibrate_ERROR_test();
-      object_array_users[0].send_message_second_chat("Верхнее положение заслонки с улицы откалибровано.");
-    }
-
-    if (calibrate_ERROR == 0) {
-      set_HIGH_limit_home();                                              // Производим калибровку второй раз на случай, если была зажата противоположенный концевик! //
-      calibrate_ERROR_test();
-      object_array_users[0].send_message_second_chat("Верхнее положение заслонки от батареи откалибровано.");
-    }
-
-    if (calibrate_ERROR == 0) {
-      set_LOW_limit_street();
-      calibrate_ERROR_test();
-      StepsGLOBAL = street_POSITION_low_cur;
-      street_POSITION_low_manual = street_POSITION_low_cur;
-      long cal_dif1 = street_POSITION_low_const - street_POSITION_low_cur;
-      object_array_users[0].send_message_second_chat("Нижнее положожение заслонки с улицы откалибровано. Результат: " + String(street_POSITION_low_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif1));
-
-      stepsAmount = (0 - street_POSITION_low_cur);
-      doXsteps_counter = doXsteps_counter - stepsAmount;                  // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
-      doXsteps_func();                                                    // Полностью открываем заслонку с улицы //
-
-      object_array_users[0].send_message_second_chat("Положение заслонки с улицы возвращено в открытое положение. Текущее положение StepsGLOBAL: " + String(StepsGLOBAL));
-    }
-
-    if (calibrate_ERROR == 0) {
-      set_LOW_limit_home();
-      calibrate_ERROR_test();
-      StepsGLOBAL = home_POSITION_low_cur;
-      home_POSITION_low_manual = home_POSITION_low_cur;
-      long cal_dif2 = home_POSITION_low_const - home_POSITION_low_cur;
-      object_array_users[0].send_message_second_chat("Нижнее положожение заслонки от батареи откалибровано. Результат: " + String(home_POSITION_low_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif2));
-    }
-  }
-
-  if (calibrate_state == 1 || calibrate_state == 2)                       // завершающий процесс любой калибровки //
-  {
-    if (calibrate_ERROR == 0)                                             // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
-    {
-      stepsAmount = StepsGLOBALbuf - StepsGLOBAL;
-      doXsteps_counter = doXsteps_counter + stepsAmount;                  // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
-      doXsteps_func();
-      calibrate_state = 0;
-      object_array_users[0].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение StepsGLOBAL: " + String(StepsGLOBAL));
-    }
-    if (calibrate_ERROR == 1)                                             // если есть ошибки - отправляем уведомление о невозможности калибровки //
-    {
-      ErrorSTATEmy = 2;
-      send_alert("ERROR: Калибровка невозможна - заклинил двигатель или не работают концевики.");
-    }
-  }
-
-  if (daily_calibrate_flag == 1 && object_TimeDate.get_TimeB() > 140101 && object_TimeDate.get_TimeB() < 185959)      // автоматическая калибровка раз в сутки в 14:01 //
-  {
-    calibrate_state = 2;
-    daily_calibrate_flag = 0;
-    object_array_users[0].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 14:00 до 19:00).");
-  }
-
-  if (daily_calibrate_flag == 0)                                          // поднимаем флаг калибровки //
-  {
-    if (object_TimeDate.get_TimeB() < 135959 || object_TimeDate.get_TimeB() > 190101) {
-      daily_calibrate_flag = 1;
-    }
-  }
-
-  if (step_counter_Flag == 1 && object_TimeDate.get_TimeB() > 234500)                           // отправка отчета по количеству пройденых шагов за день //
-  {
-    step_counter_Flag = 0;
-    object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки): " + String(doXsteps_counter));
-    doXsteps_counter = 0;
-  }
-
-  if (step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)                           // возвращает влаг обратно, чтобы отчет отправился на следующий день //
-  {
-    step_counter_Flag = 1;
-  }
-}
-
-void calibrate_ERROR_test()                      // проверяет дошел ли счетчик шагов до 0 и если дошел, то ставит флаг ошибки //
-{
-  if (steps_counter_limit4000 == 0)
-  {
-    calibrate_ERROR = 1;
-  }
-  
-  if (calibrate_ERROR == 1)
-  {
-    ErrorSTATEmy = 2;
-    send_alert("!!!FATAL_ERROR!!!_From_Chat: Заклинил двигатель или не работают концевики.");
-  }
-}
-
-void set_HIGH_limit_street()                     // Калибровка заслонки с улицы верхнее положение //
-{
-  steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-  digitalWrite(DIR, dir_UP);
-  while (digitalRead(pinKnobHigh) == 1 && steps_counter_limit4000 > 0)        // Идём вверх пока не сработает кнопка //
-  {
-    stepsSTREET8();
-  }
-
-  digitalWrite(DIR, dir_DOWN);
-  for (int i = 0; i < KNOB_space; i++)                                    // Отступаем обратно //
-  {
-    stepsSTREET8();
-  }
-}
-
-void set_HIGH_limit_home()                       // Калибровка заслонки с улицы верхнее положение //
-{
-  steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-  digitalWrite(DIR, dir_UP);
-  while (digitalRead(pinKnobHigh) == 1 && steps_counter_limit4000 > 0)        // Идём вверх пока не сработает кнопка //
-  {
-    stepsHOME8();
-  }
-
-  digitalWrite(DIR, dir_DOWN);
-  for (int i = 0; i < KNOB_space; i++)                                    // Отступаем обратно //
-  {
-    stepsHOME8();
-  }
-}
-
-void set_LOW_limit_street()                      // Калибровка заслонки с улицы нижнее положение //
-{
-  steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-  digitalWrite(DIR, dir_DOWN);
-  while (digitalRead(pinKnobLow) == 1 && steps_counter_limit4000 > 0)         // Идём вниз пока не сработает кнопка //
-  {
-    stepsSTREET8();
-    street_POSITION_low_cur--;                                            // StepsGLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
-  }
-
-  digitalWrite(DIR, dir_UP);
-  for (int i = 0; i < KNOB_space; i++)                                    // Отступаем обратно //
-  {
-    stepsSTREET8();
-    street_POSITION_low_cur++;                                            // StepsGLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
-  }
-}
-
-void set_LOW_limit_home()                        // Калибровка заслонки с улицы нижнее положение //
-{
-  steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-  digitalWrite(DIR, dir_DOWN);
-  while (digitalRead(pinKnobLow) == 1 && steps_counter_limit4000 > 0)         // Идём вниз пока не сработает кнопка //
-  {
-    stepsHOME8();
-    home_POSITION_low_cur++;                                              // StepsGLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
-    steps_counter_limit4000--;
-  }
-
-  digitalWrite(DIR, dir_UP);
-  for (int i = 0; i < KNOB_space; i++)                                    // Отступаем обратно //
-  {
-    stepsHOME8();
-    home_POSITION_low_cur--;                                              // StepsGLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
-  }
-}
-
-void stepsSTREET8()                              // Сделать 8 микрошагов (1 реальный шаг при режиме 1к8) //
-{
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(street_STEP, HIGH);
-    delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
-    digitalWrite(street_STEP, LOW);
-    delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
-  }
-}
-
-void stepsHOME8()                                // Сделать 8 микрошагов (1 реальный шаг при режиме 1к8) //
-{
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(home_STEP, HIGH);
-    delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
-    digitalWrite(home_STEP, LOW);
-    delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
+  {             
+    object_motor_main.doXsteps_func(Step_Per_loop);                // положительные значения открываем улицу, закрываем батарею //
   }
 }
 
@@ -1636,9 +1624,9 @@ void SYNCstart()                                 // Отправка темпе�
   Serial.print(";");
   Serial.print(TEMP_excel_output());
   Serial.print(";");
-  Serial.print(ErrorSTATEmy);
+  Serial.print(global_ERROR_flag);
 
-  ErrorSTATEmy = 1;
+  global_ERROR_flag = false;
 
   String SYNCmessage = Serial.readString();
 
@@ -1705,6 +1693,6 @@ String TEMP_excel_output()                         // Команда вывод�
              String(object_ds18b20_6.get_temp()) + "," +\
              String(b62) + "," + String(b82) + "," +\
              String(b61) + "," + String(b71) + "," +\
-             String(StepsGLOBAL) + "," + String(doXsteps_counter));
+             String(object_motor_main.get_steps_GLOBAL()) + "," + String(object_motor_main.get_doXsteps_counter()));
   return(Message);
 }
