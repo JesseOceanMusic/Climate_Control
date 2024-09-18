@@ -14,18 +14,31 @@ Settings > Stack Protection Enable
 // ↓↓↓ Версии Библиотек ↓↓↓ //
 
 // NTPClient                3.2.1
+
 // Adafruit BusIO           1.16.1
+
 // Adafruit GFX Lubrart     1.11.10
+
 // Adafruit SH110X          2.1.10
+
 // Adafruit SHT4x Library   1.0.4    Хотя в коде подгружается лишь эта библиотека, она подтягивает еще несколько, возможно не все.
+
 // Adafruit SSD1306         2.5.10
+
 // Adafruit United Sensor   1.1.14
+
 // Arduinojson              7.1.0
+
 // DallasTemperature        3.9.0
+
 // FastLED                  3.7.0
+
 // OneWire                  2.3.8
+
 // Sensirion Core           0.7.1
+
 // Sensirion I2C SCD 4x     0.4.0
+
 // UniversalTelegramBot     1.3.0    ! Читать "ВАЖНО" выше !
 
 
