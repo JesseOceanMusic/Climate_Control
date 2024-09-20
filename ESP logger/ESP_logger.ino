@@ -1,9 +1,3 @@
-// update v057 - Settings > Stack Protection Enable //
-
-///↓↓↓ ОТЛАДКА ↓↓↓///
-//#define local_DEBUG
-
-
 ///↓↓↓ ТЕЛЕГРАМ ↓↓↓///
 
 
@@ -120,14 +114,15 @@ class class_users
     unsigned int _MessageState;                            // стейт сообщений //
 };
 
-class_users object_array_users[6] =
+class_users object_array_users[7] =
 {
-  class_users(0, USER_ID0, true,  true,  false, "Андрей"),                             // Мой айди //
-  class_users(1, USER_ID1, false, false, false, "Катя - группа"),                      // Катя - айди группы //
-  class_users(2, USER_ID2, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
-  class_users(3, USER_ID3, false, false, false, "Саша - группа"),                      // Саша - айди группы //
-  class_users(4, USER_ID4, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
-  class_users(5, USER_ID5, false, false, true,  "Гостевой чат"),                       // гостевой юзер //
+  class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
+  class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
+  class_users(2, USER_ID2_debug,         false, false, false, "Debug"),                               // Группа для дебаг-сообщений //  
+  class_users(3, USER_ID3_Kate_group,    false, false, false, "Катя - группа"),                      // Катя - айди группы //
+  class_users(4, USER_ID4_Kate_personal, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
+  class_users(5, USER_ID5_Sasha_group,   false, false, false, "Саша - группа"),                      // Саша - айди группы //
+  class_users(6, USER_ID6_Slava_Artem,   false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
 };
 
 void class_users::send_message(String input)
@@ -559,6 +554,14 @@ String SYNCdata;                                 // стринг для полу
 bool flag_every_day_timer = false;               // флаг для отправки лога раз в сутки //
 
 
+///↓↓↓ ОТЛАДКА ↓↓↓///
+#define Jesse_DEBUG
+
+#ifdef Jesse_DEBUG
+  time_t Jesse_debug_timer;
+#endif
+
+
 ///   ///   ///   ///   ///   ///   ///
 
 
@@ -567,7 +570,8 @@ void setup()                                     // стандартная фу�
   Serial.begin(9600);                                                     // запускаем Serial Port и определяем его скорость //
   Serial.setTimeout(200);                                                 // таймаут для .readString (ждет заданное значение на чтение Serial) // нет смысла ждать стандартную секунду(1000 милисекунд), поскольку синхронизация происходит асинхронно //
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);                                   // подключаемся к Wi-Fi //
+  WiFi.setOutputPower(15.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
   object_TimeDate.set_UTC_time();                                         // устанавливаем связь с сервером реального времени и получаем актуальное время //
 
@@ -581,9 +585,12 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  #ifdef local_DEBUG
-    Serial.print("ESP.getFreeHeap(): ");
-    Serial.println(ESP.getFreeHeap());  
+  #ifdef Jesse_DEBUG
+    if (object_TimeDate.get_UTC() - Jesse_debug_timer > 60*5)
+    {
+      object_array_users[2].send_message("Logger: ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
+      Jesse_debug_timer = object_TimeDate.get_UTC();
+    }
   #endif
 
   object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
@@ -727,9 +734,9 @@ void Message_command_executer(String text)       // обработчик ком�
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
-          object_array_users[5].set_id(text);
+          object_array_users[1].set_id(text);
           object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
-          object_array_users[5].send_message("Я проснулся.");
+          object_array_users[1].send_message("Я проснулся.");
         }
 
         else 
