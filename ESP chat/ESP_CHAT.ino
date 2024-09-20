@@ -1,6 +1,3 @@
-///↓↓↓ ОТЛАДКА ↓↓↓///
-//#define local_DEBUG
-
 /// ↓↓↓ ТЕЛЕГРАМ ↓↓↓ ///
 
 
@@ -117,14 +114,15 @@ class class_users
     unsigned int _MessageState;                            // стейт сообщений //
 };
 
-class_users object_array_users[6] =
+class_users object_array_users[7] =
 {
-  class_users(0, USER_ID0, true,  true,  false, "Андрей"),                             // Мой айди //
-  class_users(1, USER_ID1, false, false, false, "Катя - группа"),                      // Катя - айди группы //
-  class_users(2, USER_ID2, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
-  class_users(3, USER_ID3, false, false, false, "Саша - группа"),                      // Саша - айди группы //
-  class_users(4, USER_ID4, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
-  class_users(5, USER_ID5, false, false, true,  "Гостевой чат"),                       // гостевой юзер //
+  class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
+  class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
+  class_users(2, USER_ID2_debug,         false, false, false, "Debug"),                               // Группа для дебаг-сообщений //  
+  class_users(3, USER_ID3_Kate_group,    false, false, false, "Катя - группа"),                      // Катя - айди группы //
+  class_users(4, USER_ID4_Kate_personal, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
+  class_users(5, USER_ID5_Sasha_group,   false, false, false, "Саша - группа"),                      // Саша - айди группы //
+  class_users(6, USER_ID6_Slava_Artem,   false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
 };
 
 void class_users::send_message(String input)
@@ -452,8 +450,8 @@ int AirLowLimit = 25;                            // минимальный пр�
 const byte pin_step_SREET = 12;    //D6              // пин для управления шагами двигателя заслонки с улицы //
 const byte pin_step_HOME = 13;     //D7               // пин для управления шагами двигателя заслонки от батареи //
 const byte pin_DIR = 15;           //D8                     // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
-const byte pin_knob_LOW = 0;      //D3                // нижние концевики  //
-const byte pin_knob_HIGH = 2;     //D4               // верхние концевики //
+const byte pin_knob_LOW = 0;       //D3                // нижние концевики  //
+const byte pin_knob_HIGH = 2;      //D4               // верхние концевики //
 
 
 byte calibrate_state;
@@ -916,40 +914,32 @@ class SCD41                                      // класс датчика С
   
     void restart()
     {
-      uint16_t error_co2;
-      error_co2 = scd4x.stopPeriodicMeasurement();
-      if (error_co2)
-      {
-        send_alert("ERROR: Не смог остановить переодическое измерение датчика со2 перед запуском.");
-        global_ERROR_flag = true;
-      }
-      else
-      {
-        object_array_users[0].send_message("ОСТАНОВИЛ периодическое измерение в датчике СО2.");
-      }
-      
-      error_co2 = scd4x.setSensorAltitude(_altitude);
-      if (error_co2)
-      {
-        send_alert("ERROR: Не смог установить Altitude (высоту над уровнем моря) в датчике со2.");
-        global_ERROR_flag = true;
-      }
-      else
-      {
-        object_array_users[0].send_message("Выставил ALTITUDE (высоту над уровнем моря): " + String(_altitude) + "метров.");
-      }      
+      _stop_periodioc_mesuarement();
+      _set_altitude();
+      _start_periodioc_mesuarement();
+    }
 
-      error_co2 = scd4x.startLowPowerPeriodicMeasurement();          // startLowPowerPeriodicMeasurement - данные обновляются раз в 30сек, startPeriodicMeasurement - данные обновляются раз в 5 секунд // SingleShot был изначально - на обоих датчиках проблема с повторяемостью показаний в +-50... // 
-      if (error_co2)
-      {
-        send_alert("ERROR: Не смог запустить переодическое измерение датчика со2.");
-        global_ERROR_flag = true;
-      }
-      else
-      {
-        object_array_users[0].send_message("ЗАПУСТИЛ периодическое измерение в датчике СО2.");
-      }
-      
+    void recalibration()
+    {
+      object_array_users[0].send_message("Начинаю процесс принудительной рекалибровки. Это займет 5 минут.");
+
+      _stop_periodioc_mesuarement();
+      _set_altitude();
+      _start_periodioc_mesuarement();
+
+      delay(1000*60*5);
+
+      _stop_periodioc_mesuarement();    
+      _forced_recalibration();
+      _start_periodioc_mesuarement();
+    }
+
+    void factory_reset()
+    {
+      _stop_periodioc_mesuarement();
+      _factory_reset();
+      _set_altitude();
+      _start_periodioc_mesuarement();   
     }
 
     void update()
@@ -1015,9 +1005,97 @@ class SCD41                                      // класс датчика С
         send_alert("ALERT уровень со2: " + String(_CO2) + "ppm");
       }
     }
+
+    void _stop_periodioc_mesuarement()
+    {
+      uint16_t error_co2;
+      error_co2 = scd4x.stopPeriodicMeasurement();
+      if (error_co2)
+      {
+        send_alert("ERROR: Не смог остановить переодическое измерение датчика СО2.");
+        global_ERROR_flag = true;
+      }
+      else
+      {
+        object_array_users[0].send_message("ОСТАНОВИЛ периодическое измерение в датчике СО2.");
+      }
+    }
+
+    void _set_altitude()
+    {
+      uint16_t error_co2;
+      error_co2 = scd4x.setSensorAltitude(_altitude);
+      if (error_co2)
+      {
+        send_alert("ERROR: Не смог установить Altitude (высоту над уровнем моря) в датчике со2.");
+        global_ERROR_flag = true;
+      }
+      else
+      {
+        object_array_users[0].send_message("Выставил ALTITUDE (высоту над уровнем моря): " + String(_altitude) + "метров.");
+      } 
+    }
+
+    void _start_periodioc_mesuarement()
+    {
+      uint16_t error_co2;
+      error_co2 = scd4x.startPeriodicMeasurement();          // startLowPowerPeriodicMeasurement - данные обновляются раз в 30сек, startPeriodicMeasurement - данные обновляются раз в 5 секунд // SingleShot был изначально - на обоих датчиках проблема с повторяемостью показаний в +-50... // 
+      if (error_co2)
+      {
+        send_alert("ERROR: Не смог запустить переодическое измерение датчика со2.");
+        global_ERROR_flag = true;
+      }
+      else
+      {
+        object_array_users[0].send_message("ЗАПУСТИЛ периодическое измерение в датчике СО2.");
+      }      
+    }
+
+    void _forced_recalibration()
+    {
+      uint16_t error_co2;
+      uint16_t targetCo2Concentration = 400;
+      uint16_t frcCorrection;
+
+      error_co2 = scd4x.performForcedRecalibration(targetCo2Concentration, frcCorrection);
+      if (error_co2)
+      {
+        send_alert("ERROR: Не смог произвести принудительную рекалибровку.");
+        global_ERROR_flag = true;
+      }
+      else
+      {
+        frcCorrection = frcCorrection - 0x8000;
+        object_array_users[0].send_message("Рекалибровка прошла успешно. \n\nРезультаты:\n Текущее значение СО2: " + String(targetCo2Concentration) + "ppm.\n Коррекция: " + String(frcCorrection) + "ppm.");
+      }
+    }
+
+    void _factory_reset()
+    {
+      uint16_t error_co2;
+
+      error_co2 = scd4x.performFactoryReset();
+      if (error_co2)
+      {
+        send_alert("ERROR: Не смог произвести сброс на заводские настройки.");
+        global_ERROR_flag = true;
+      }
+      else
+      {
+        object_array_users[0].send_message("Сброс на заводские настройки прошёл успешно.");
+      }
+    }
 };
 
 SCD41 object_CO2_sensor;                         
+
+
+///↓↓↓ ОТЛАДКА ↓↓↓///
+#define Jesse_DEBUG
+
+#ifdef Jesse_DEBUG
+  time_t Jesse_debug_timer;
+#endif
 
 
 ///   ///   ///   ///   ///   ///   ///
@@ -1028,6 +1106,7 @@ void setup()                                     // стандартная фу�
   Serial.begin(9600);                            // запускаем Serial Port и определяем его скорость //
   Serial.setTimeout(200);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
+  WiFi.setOutputPower(15.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
   object_TimeDate.set_UTC_time();
@@ -1062,11 +1141,13 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  #ifdef local_DEBUG
-    Serial.print("ESP.getFreeHeap(): ");
-    Serial.println(ESP.getFreeHeap());  
+  #ifdef Jesse_DEBUG
+    if (object_TimeDate.get_UTC() - Jesse_debug_timer > 60*5)
+    {
+      object_array_users[2].send_message("Logger: ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
+      Jesse_debug_timer = object_TimeDate.get_UTC();
+    }
   #endif
-
 
   object_TimeDate.update_TimeDate();                                      // обновляем текущее время //
   
@@ -1257,9 +1338,9 @@ void Message_command_executer(String text)       // обработчик ком�
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
-          object_array_users[5].set_id(text);
+          object_array_users[1].set_id(text);
           object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
-          object_array_users[5].send_message("Я проснулся.");
+          object_array_users[1].send_message("Я проснулся.");
         }
 
         else 
@@ -1493,6 +1574,42 @@ void Message_command_executer(String text)       // обработчик ком�
         }
         break;
       }
+
+      case 352:
+      {
+        object_array_users[users_array_index].send_message("Рекалибровка датчика СО2 нужна в случае, если даже при открытых окнах он не показывает значение около 400 и нужно его рекалибровать.\n\nПри рекалибровке необходимо максимально проветрить помещение, чтобы воздух был близок к уличному.\n\n\nПродолжить? - /35201@JOArduinoChatBOT");
+        break;      
+      }
+
+      case 35201:
+        if (object_array_users[users_array_index].get_admin_flag() == true)
+        {
+          object_CO2_sensor.recalibration();
+        }
+
+        else
+        {
+          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        }
+        break;
+
+      case 353:
+      {
+        object_array_users[users_array_index].send_message("Сброс на заводские настройки сбрасывает все настройки, в том числе параметры калбировки датчика.\n\n\nПродолжить? - /35301@JOArduinoChatBOT");
+        break;      
+      }
+
+      case 35301:
+        if (object_array_users[users_array_index].get_admin_flag() == true)
+        {
+          object_CO2_sensor.factory_reset();
+        }
+
+        else
+        {
+          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        }
+        break;
 
       case 390:                             // выбор гостевого чата //
       {
