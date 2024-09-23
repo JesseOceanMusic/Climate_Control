@@ -34,6 +34,8 @@ UniversalTelegramBot bot4(BOT_TOKEN4, secured_client);                         /
 
 bool message_intruder_flag = true;
 byte users_array_index;
+bool shutdown_friends = false;
+const byte user_array_length = 7;
 
 class class_users
 {
@@ -60,6 +62,10 @@ class class_users
 
     void send_alert(String input)
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       if (_alert_flag == true)
       {
         bot2.sendMessage(_id, input, "");
@@ -114,7 +120,7 @@ class class_users
     unsigned int _MessageState;                            // стейт сообщений //
 };
 
-class_users object_array_users[7] =
+class_users object_array_users[user_array_length] =
 {
   class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
   class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
@@ -127,6 +133,10 @@ class_users object_array_users[7] =
 
 void class_users::send_message(String input)
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   bot2.sendMessage(_id, input, "");
   if(_need_supervision == true)
   {
@@ -136,6 +146,10 @@ void class_users::send_message(String input)
 
 void class_users::check_id(String CHAT_IDcur)
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if(CHAT_IDcur == _id)
   {
     users_array_index = _users_array_index;
@@ -153,21 +167,21 @@ void message_id_check(String CHAT_IDcur)                          // Права 
   message_intruder_flag = true;
 
   object_array_users[0].check_id(CHAT_IDcur);
-  object_array_users[1].check_id(CHAT_IDcur);
-  object_array_users[2].check_id(CHAT_IDcur);
-  object_array_users[3].check_id(CHAT_IDcur);
-  object_array_users[4].check_id(CHAT_IDcur);
-  object_array_users[5].check_id(CHAT_IDcur);
+  if(shutdown_friends == false)
+  {
+    for(int i = 1; i < user_array_length; i++)
+    {
+      object_array_users[i].check_id(CHAT_IDcur);
+    }
+  }
 }
 
 void send_alert(String input_message)
 {
-  object_array_users[0].send_alert(input_message);
-  object_array_users[1].send_alert(input_message);
-  object_array_users[2].send_alert(input_message);
-  object_array_users[3].send_alert(input_message);
-  object_array_users[4].send_alert(input_message);
-  object_array_users[5].send_alert(input_message);
+  for(int i = 0; i < user_array_length; i++)
+  {
+    object_array_users[i].send_alert(input_message);
+  }
 }
 
 
@@ -184,6 +198,10 @@ class class_TimeDate                             // класс Даты и Вр�
 
     void update_TimeDate()                       // обновление текущей даты и времени
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       _UTC_time = time(nullptr);
       struct tm* L_tm = localtime(&_UTC_time);
 
@@ -330,6 +348,10 @@ class class_NightTime                            // класс ночного р
 
     void update_NightTime()                      // метод проверки пора ли переключить ночной режим //
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       if(_NightTimeState <= 3)                             // Ночной режим ВКЛ с 21:00 до 6:48 //
       { 
         if (object_TimeDate.get_TimeB() > 210000 || object_TimeDate.get_TimeB() < 64800)
@@ -463,6 +485,10 @@ class class_Clock                                // класс часов //
 
     void update()                                          // вызов update отдельных объектов должен быть обязательно последовательным, поскольку внутри есть сразу сложение в основной массив. если вызывать update у объектов в другой последовательности - отобразиться чушь. //
     { 
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       byte buf_array [14];
 
       for (int i = 0; i < 7; i++)                          // по сути, этот цикл является очень примитивным дешифратором, где _key_ID это индекс строки в массиве _key_ARRAY, на которой лежит ключ//
@@ -554,12 +580,43 @@ String SYNCdata;                                 // стринг для полу
 bool flag_every_day_timer = false;               // флаг для отправки лога раз в сутки //
 
 
-///↓↓↓ ОТЛАДКА ↓↓↓///
-#define Jesse_DEBUG
+///↓↓↓ ПЕРЕЗАГРУЗКА ↓↓↓///
 
-#ifdef Jesse_DEBUG
-  time_t Jesse_debug_timer;
+
+bool esp_restart_flag = false;
+bool skip_one_iteration = true;
+
+void restart_check()
+{
+  if(esp_restart_flag == true)
+  {
+    if(skip_one_iteration == true)
+    {
+      skip_one_iteration = false;
+    }
+
+    else
+    {
+      ESP.restart();
+    }
+  }
+}
+
+
+///↓↓↓ ОТЛАДКА ↓↓↓///
+
+
+//#define Jesse_DEBUG_free_heap
+#ifdef Jesse_DEBUG_free_heap
+  time_t Jesse_debug_free_heap_timer;
 #endif
+
+//#define Jesse_DEBUG_loop_millis_measure
+#ifdef Jesse_DEBUG_loop_millis_measure
+  long test_timer;
+#endif
+
+#define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 
 ///   ///   ///   ///   ///   ///   ///
@@ -585,12 +642,19 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  #ifdef Jesse_DEBUG
-    if (object_TimeDate.get_UTC() - Jesse_debug_timer > 60*5)
+  #ifdef Jesse_DEBUG_free_heap
+    if (object_TimeDate.get_UTC() - Jesse_debug_free_heap_timer > 60*5)
     {
-      object_array_users[2].send_message("Logger: ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
-      Jesse_debug_timer = object_TimeDate.get_UTC();
+      object_array_users[2].send_message("ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
+      Jesse_debug_free_heap_timer = object_TimeDate.get_UTC();
     }
+  #endif
+
+  #ifdef Jesse_DEBUG_loop_millis_measure
+    long buf_timer = millis() - test_timer;
+    object_array_users[2].send_message(String(buf_timer));
+    delay(3000);
+    test_timer = millis();
   #endif
 
   object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
@@ -616,8 +680,17 @@ void loop()                                      // основной луп //
   
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)    // таймер каждую нечетную минуту //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     LOGtimer(); 
     NightTimeDim();
+    
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif    
+    
     Led_animation_up();
     clock_master();
     flag_every_minute_timer = true;
@@ -625,11 +698,22 @@ void loop()                                      // основной луп //
 
   if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)    // таймер каждую четную минуту //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     SYNCdata = "";                                                             // обнуляем стринг с датой, чтобы при ошибках синхронизации на часах не продолжали висеть старые данные //
     SYNCstart();
     NightTimeDim();
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     Led_animation_down();
     clock_master();
+
+    restart_check();
     flag_every_minute_timer = false;
   }
 
@@ -637,6 +721,10 @@ void loop()                                      // основной луп //
 
 void Message_from_Telegram_converter()           // преобразование сообщение из Телеграм в команду //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   String CHAT_IDcur = bot2.messages[0].chat_id;
   message_id_check(CHAT_IDcur);
   if (message_intruder_flag == false)
@@ -661,6 +749,10 @@ void Message_from_Telegram_converter()           // преобразование
 
 void Message_command_executer(String text)       // обработчик команд //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if(text == "/back")                                            // отмена ввода //
   {
     if (object_array_users[users_array_index].get_message_state() == 1)
@@ -970,6 +1062,43 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
+      case 370:
+      {
+        if (object_array_users[users_array_index].get_admin_flag() == true)
+        {
+          object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
+          esp_restart_flag = true;
+        }
+
+        else 
+        {
+          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        }
+        break;
+      }
+
+      case 380:
+      {
+        if (users_array_index == 0)
+        {
+          shutdown_friends = !shutdown_friends;
+          if(shutdown_friends == true)
+          {
+            object_array_users[users_array_index].send_message("Отключил возможность управления из друх чатов.");
+          }
+          else
+          {
+            object_array_users[users_array_index].send_message("Восстановил возможность управления из других чатов.");
+          }
+        }
+
+        else
+        {
+          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        }        
+        break;
+      }
+
       case 390:                              // выбор гостевого чата кнопки //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
@@ -990,6 +1119,10 @@ void Message_command_executer(String text)       // обработчик ком�
 
 void SYNCstart()                                 // получение температур, проверка времени, синхронизация ошибок //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   Serial.println(object_TimeDate.get_UTC());                              // отправляем время для синхронизации //
   
   String SYNCmessage = Serial.readString();
@@ -1031,6 +1164,10 @@ void SYNCstart()                                 // получение темп�
 
 void LOGtimer()                                  // отправка лога в 23:45 //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (flag_every_day_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
   {
     if (!SD.begin(4))
@@ -1059,6 +1196,10 @@ void LOGtimer()                                  // отправка лога в
 
 void LOGwrite()                                  // запись в лог //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (!SD.begin(4))
   {
     send_alert("ERROR: SD card initialization FAILED");
@@ -1079,6 +1220,10 @@ void LOGwrite()                                  // запись в лог //
 
 void LOGread()                                   // чтение лога //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (!SD.begin(4))
   {
     send_alert("ERROR: SD card initialization FAILED");
@@ -1098,6 +1243,10 @@ void LOGread()                                   // чтение лога //
 
 void NightTimeDim()                              // плавное изменение яркости //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (object_NightTime.get_NightTimeDimState() == 2)                    // Уменьшение яркости (займет 10 минут при стандартной яркости) // 
   {
     HSVval1cur = HSVval1cur - 8;
@@ -1302,6 +1451,10 @@ void clock_master()                              // мастер функция 
 
 void clock_string_to_array_converter()           // конвертация показаний с датчиков в 13 цифр для индикации на табло //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   byte dividerIndex = SYNCdata.indexOf(',');
   String buf_temp = SYNCdata.substring(0, dividerIndex);
   String buf1 = SYNCdata.substring(dividerIndex + 1);
