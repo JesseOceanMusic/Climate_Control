@@ -21,6 +21,7 @@
   USER_ID3
   USER_ID4
   USER_ID5
+  USER_ID6
 */
 
 X509List cert(TELEGRAM_CERTIFICATE_ROOT);                       // какой-то сертификат //
@@ -33,7 +34,7 @@ UniversalTelegramBot bot3(BOT_TOKEN3, secured_client);          // BOT "Calibrat
 
 bool message_intruder_flag = true;
 byte users_array_index;
-
+bool shutdown_friends = false;
 
 class class_users
 {
@@ -55,11 +56,19 @@ class class_users
 
     void send_message_second_chat(String input)
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       bot3.sendMessage(_id, input, "");
     }
 
     void send_alert(String input)
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+      
       if (_alert_flag == true)
       {
         bot1.sendMessage(_id, input, "");
@@ -114,7 +123,8 @@ class class_users
     unsigned int _MessageState;                            // стейт сообщений //
 };
 
-class_users object_array_users[7] =
+const byte user_array_length = 7;
+class_users object_array_users[user_array_length] =
 {
   class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
   class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
@@ -127,6 +137,10 @@ class_users object_array_users[7] =
 
 void class_users::send_message(String input)
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   bot1.sendMessage(_id, input, "");
   if(_need_supervision == true)
   {
@@ -136,6 +150,10 @@ void class_users::send_message(String input)
 
 void class_users::check_id(String CHAT_IDcur)
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if(CHAT_IDcur == _id)
   {
     users_array_index = _users_array_index;
@@ -153,21 +171,21 @@ void message_id_check(String CHAT_IDcur)                          // Права 
   message_intruder_flag = true;
 
   object_array_users[0].check_id(CHAT_IDcur);
-  object_array_users[1].check_id(CHAT_IDcur);
-  object_array_users[2].check_id(CHAT_IDcur);
-  object_array_users[3].check_id(CHAT_IDcur);
-  object_array_users[4].check_id(CHAT_IDcur);
-  object_array_users[5].check_id(CHAT_IDcur);
+  if(shutdown_friends == false)
+  {
+    for(int i = 1; i < user_array_length; i++)
+    {
+      object_array_users[i].check_id(CHAT_IDcur);
+    }
+  }
 }
 
 void send_alert(String input_message)
 {
-  object_array_users[0].send_alert(input_message);
-  object_array_users[1].send_alert(input_message);
-  object_array_users[2].send_alert(input_message);
-  object_array_users[3].send_alert(input_message);
-  object_array_users[4].send_alert(input_message);
-  object_array_users[5].send_alert(input_message);
+  for(int i = 0; i < user_array_length; i++)
+  {
+    object_array_users[i].send_alert(input_message);
+  }
 }
 
 
@@ -184,6 +202,10 @@ class class_TimeDate                             // класс Даты и Вр�
 
     void update_TimeDate()                       // обновление текущей даты и времени
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+            
       _UTC_time = time(nullptr);
       struct tm* L_tm = localtime(&_UTC_time);
 
@@ -197,6 +219,10 @@ class class_TimeDate                             // класс Даты и Вр�
       _TimeHOUR = buf_Time_HOUR.toInt();
       _TimeMIN = buf_Time_MIN.toInt();
       _TimeSEC = buf_Time_SEC.toInt();
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
 
       if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
       {
@@ -222,6 +248,10 @@ class class_TimeDate                             // класс Даты и Вр�
       {
         buf_Time_SEC = String ("0" + buf_Time_SEC);
       }
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
 
       _DateMONTH = buf_Date_MONTH.toInt();
       _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
@@ -354,6 +384,11 @@ class class_ds18b20                              // класс датчиков 
       _array_address[1]= ar1;
       _array_address[2]= ar2;
       _array_address[3]= ar3;
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       _array_address[4]= ar4;
       _array_address[5]= ar5;
       _array_address[6]= ar6;
@@ -363,16 +398,28 @@ class class_ds18b20                              // класс датчиков 
     
     void update()                                // обновление данных с датчика //
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       _temp = ds.getTempC(_array_address);
       if (_alert_flag == true)
       {
         _check_alerts();
       }
       _check_errors();
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif      
     }
 
     float get_temp()
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+      
       return(_temp);
     }
     
@@ -825,10 +872,18 @@ class SHT41                                      // класс датчика SH
 
     void update()                                // обновление данных с датчика //
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       sensors_event_t humidity, temp;                // запрашиваем температуру и влажность адафрут //
       sht4.getEvent(&humidity, &temp);               // обновляем показания температуры и влажность //
       _temp = temp.temperature;
       _humidity = humidity.relative_humidity;
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
 
       _check_errors();
     }
@@ -927,9 +982,10 @@ class SCD41                                      // класс датчика С
       _set_altitude();
       _start_periodioc_mesuarement();
 
-      delay(1000*60*5);
+      delay(1000*60*5);                      // минимум 3 минуты датчик должен замерять СО2 //
 
-      _stop_periodioc_mesuarement();    
+      _stop_periodioc_mesuarement();
+      delay(500);                            // необходимая задержка перед рекалибровкой //    
       _forced_recalibration();
       _start_periodioc_mesuarement();
     }
@@ -952,6 +1008,10 @@ class SCD41                                      // класс датчика С
         bool isDataReady = false;
         unsigned long timer_20_sec = millis();
 
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
+
         error_co2 = scd4x.readMeasurement(_CO2, buf_temperature_co2, buf_humidity_co2);
         if (error_co2)
         {
@@ -959,6 +1019,10 @@ class SCD41                                      // класс датчика С
           _CO2 = 0;
           global_ERROR_flag = true;
         }
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
 
         _check_errors();
         _check_alerts();
@@ -1055,7 +1119,7 @@ class SCD41                                      // класс датчика С
     {
       uint16_t error_co2;
       uint16_t targetCo2Concentration = 400;
-      uint16_t frcCorrection;
+      uint16_t frcCorrection = 0x0000;
 
       error_co2 = scd4x.performForcedRecalibration(targetCo2Concentration, frcCorrection);
       if (error_co2)
@@ -1063,10 +1127,15 @@ class SCD41                                      // класс датчика С
         send_alert("ERROR: Не смог произвести принудительную рекалибровку.");
         global_ERROR_flag = true;
       }
+      else if (frcCorrection == 0xFFFF)                               // 0xFFFF = 65535 //
+      {
+        send_alert("ERROR: Ошибка в процессе рекалибровки.");
+        global_ERROR_flag = true;        
+      }
       else
       {
-        frcCorrection = frcCorrection - 0x8000;
-        object_array_users[0].send_message("Рекалибровка прошла успешно. \n\nРезультаты:\n Текущее значение СО2: " + String(targetCo2Concentration) + "ppm.\n Коррекция: " + String(frcCorrection) + "ppm.");
+        uint16_t Correction_in_ppm = frcCorrection - 0x8000;                 // 0x8000 = 32768 //
+        object_array_users[0].send_message("Рекалибровка прошла успешно. \n\nРезультаты:\n Текущее значение СО2: " + String(targetCo2Concentration) + "ppm.\n Коррекция: " + String(Correction_in_ppm) + "ppm." + "\n\n frcCorrection: " + String(frcCorrection));
       }
     }
 
@@ -1090,12 +1159,43 @@ class SCD41                                      // класс датчика С
 SCD41 object_CO2_sensor;                         
 
 
-///↓↓↓ ОТЛАДКА ↓↓↓///
-#define Jesse_DEBUG
+///↓↓↓ ПЕРЕЗАГРУЗКА ↓↓↓///
 
-#ifdef Jesse_DEBUG
-  time_t Jesse_debug_timer;
+
+bool esp_restart_flag = false;
+bool skip_one_iteration = true;
+
+void restart_check()
+{
+    if(esp_restart_flag == true)
+  {
+    if(skip_one_iteration == true)
+    {
+      skip_one_iteration = false;
+    }
+
+    else
+    {
+      ESP.restart();
+    }
+  }
+}
+
+
+///↓↓↓ ОТЛАДКА ↓↓↓///
+
+
+//#define Jesse_DEBUG_free_heap
+#ifdef Jesse_DEBUG_free_heap
+  time_t Jesse_debug_free_heap_timer;
 #endif
+
+//#define Jesse_DEBUG_loop_millis_measure
+#ifdef Jesse_DEBUG_loop_millis_measure
+  long test_timer;
+#endif
+
+#define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 
 ///   ///   ///   ///   ///   ///   ///
@@ -1141,16 +1241,23 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  #ifdef Jesse_DEBUG
-    if (object_TimeDate.get_UTC() - Jesse_debug_timer > 60*5)
+  #ifdef Jesse_DEBUG_free_heap
+    if (object_TimeDate.get_UTC() - Jesse_debug_free_heap_timer > 60*5)
     {
-      object_array_users[2].send_message("Logger: ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
-      Jesse_debug_timer = object_TimeDate.get_UTC();
+      object_array_users[2].send_message("ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
+      Jesse_debug_free_heap_timer = object_TimeDate.get_UTC();
     }
   #endif
 
+  #ifdef Jesse_DEBUG_loop_millis_measure
+    long buf_timer = millis() - test_timer;
+    object_array_users[2].send_message(String(buf_timer));
+    delay(3000);
+    test_timer = millis();
+  #endif
+
   object_TimeDate.update_TimeDate();                                      // обновляем текущее время //
-  
+
   if (bot1.getUpdates(bot1.last_message_received + 1) != 0)               // если есть новые сообщения обрабатываем одно //
   {
     Message_from_Telegram_converter();
@@ -1158,9 +1265,16 @@ void loop()                                      // основной луп //
 
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)              // таймер каждую нечетную минуту //
   {
-    update_sensors_data_and_calculations();                      
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif    
 
+    update_sensors_data_and_calculations();                      
     SYNCstart();
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
 
     humidifier();
     thermostat();
@@ -1171,15 +1285,26 @@ void loop()                                      // основной луп //
   if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)              // таймер каждую четную минуту //
   {
     object_motor_main.calibrate_test();                                                  // проверяет нужна ли калибровка //
+
+    restart_check();
     flag_every_minute_timer = false;
   }
 }
 
 void Message_from_Telegram_converter()           // преобразование сообщение из Телеграм в команду //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   String CHAT_IDcur = bot1.messages[0].chat_id;
   String text = bot1.messages[0].text;
   message_id_check(CHAT_IDcur);
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+    
   if (message_intruder_flag == false)
   {
     byte dividerIndex = text.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
@@ -1200,6 +1325,10 @@ void Message_from_Telegram_converter()           // преобразование
 
 void Message_command_executer(String text)       // обработчик команд //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (text == "/back")                      // отмена ввода //
   {
     if (object_array_users[users_array_index].get_message_state() == 1)
@@ -1209,13 +1338,17 @@ void Message_command_executer(String text)       // обработчик ком�
     
     else
     {
-     object_array_users[users_array_index].set_message_state(1);
+      object_array_users[users_array_index].set_message_state(1);
       object_array_users[users_array_index].send_message("Ввод данных отменен.");
     }
   }
-  
+
   else if (object_array_users[users_array_index].get_message_state() != 1)               // если MessageState != 1, то значит ожидаем ввод данных //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     switch (object_array_users[users_array_index].get_message_state())
     {
       case 10301:                                // установка температуры (нижняя граница) ALERT //
@@ -1355,6 +1488,10 @@ void Message_command_executer(String text)       // обработчик ком�
 
   else                                       // если MessageState == 1, то значит ожидаем команду //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     byte dividerIndex = text.indexOf('/');   // ищем индекс разделителя "/" //
     text = text.substring(dividerIndex + 1); // оставляем только команду "1" //
     int text_int = text.toInt();
@@ -1582,6 +1719,7 @@ void Message_command_executer(String text)       // обработчик ком�
       }
 
       case 35201:
+      {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
           object_CO2_sensor.recalibration();
@@ -1592,6 +1730,7 @@ void Message_command_executer(String text)       // обработчик ком�
           object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
         }
         break;
+      }
 
       case 353:
       {
@@ -1600,6 +1739,7 @@ void Message_command_executer(String text)       // обработчик ком�
       }
 
       case 35301:
+      {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
           object_CO2_sensor.factory_reset();
@@ -1610,6 +1750,44 @@ void Message_command_executer(String text)       // обработчик ком�
           object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
         }
         break;
+      }
+
+      case 370:
+      {
+        if (object_array_users[users_array_index].get_admin_flag() == true)
+        {
+          object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
+          esp_restart_flag = true;
+        }
+
+        else 
+        {
+          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        }
+        break;
+      }
+
+      case 380:
+      {
+        if (users_array_index == 0)
+        {
+          shutdown_friends = !shutdown_friends;
+          if(shutdown_friends == true)
+          {
+            object_array_users[users_array_index].send_message("Отключил возможность управления из друх чатов.");
+          }
+          else
+          {
+            object_array_users[users_array_index].send_message("Восстановил возможность управления из других чатов.");
+          }
+        }
+
+        else
+        {
+          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        }        
+        break;
+      }
 
       case 390:                             // выбор гостевого чата //
       {
@@ -1631,6 +1809,10 @@ void Message_command_executer(String text)       // обработчик ком�
 
 void update_sensors_data_and_calculations()      // Опрос датчиков и расчеты //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   object_Temp_Humidity_sensor.update();
  
   ds.requestTemperatures();                              // запрашиваем температуру со всех датчиков ds18b20 сразу, а дальше только получаем данные //
@@ -1657,6 +1839,10 @@ void update_sensors_data_and_calculations()      // Опрос датчиков 
 
 void calculations_b23(float buf_c1)              // расчет b23 (Эффективность рекуперации на приток) //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (object_ds18b20_0.get_temp() == object_ds18b20_1.get_temp())                                  // Исключить деление на 0 //
   {
     b23 = 0;
@@ -1675,6 +1861,10 @@ void calculations_b23(float buf_c1)              // расчет b23 (Эффек
 
 void calculations_b45(float buf_c1)              // расчет b45 (Эффективность рекуперации на вытяжку) // 
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (object_ds18b20_2.get_temp() == object_ds18b20_3.get_temp())                                  // Исключить деление на 0 //
   {
     b45 = 0;
@@ -1693,6 +1883,10 @@ void calculations_b45(float buf_c1)              // расчет b45 (Эффек
 
 void calculations_b61_b71(float buf_c1)          // расчет b61 (Процент воздуха с улицы) и b71 (Процент воздуха с батареи) //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+  
   if ((object_ds18b20_5.get_temp() > object_ds18b20_4.get_temp() + 7) && object_ds18b20_6.get_temp() < object_ds18b20_5.get_temp() && object_ds18b20_6.get_temp() > object_ds18b20_4.get_temp())       // Условия при которых формула должна работать корректно //
   {
     b61 = ((object_ds18b20_5.get_temp() - object_ds18b20_6.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;         // ПРОЦЕНТ ВОЗДУХА С УЛИЦЫ //
@@ -1708,6 +1902,10 @@ void calculations_b61_b71(float buf_c1)          // расчет b61 (Проце
 
 void humidifier()                                // увлажнитель //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (object_TimeDate.get_DateMONTH() >= humidity_month_start || object_TimeDate.get_DateMONTH() <= humidity_month_end)
   {
     if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
@@ -1724,6 +1922,10 @@ void humidifier()                                // увлажнитель //
 
 void thermostat()                                // термостат //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if ((object_ds18b20_0.get_temp() < TempMain - TempRange) && (b61 > AirLowLimit + 5))
   {       
     object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
@@ -1737,6 +1939,10 @@ void thermostat()                                // термостат //
 
 void SYNCstart()                                 // Отправка температур и проверка времени на синхронизацию //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   Serial.print(object_TimeDate.get_UTC());
   Serial.print(";");
   Serial.print(TEMP_excel_output());
@@ -1749,6 +1955,10 @@ void SYNCstart()                                 // Отправка темпе�
 
   if (SYNCmessage.length() > 2)                  // Проверка что вообще что-то пришло //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     unsigned long SYNCtime = SYNCmessage.toInt();
     unsigned long UTC_timeLong = object_TimeDate.get_UTC();
     unsigned long unSYNC = UTC_timeLong - SYNCtime;
@@ -1767,11 +1977,19 @@ void SYNCstart()                                 // Отправка темпе�
 
 String TEMP_text_output()                          // Команда вывода данных в текстовом виде //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   int air_exchange_caclulated = 0;
   if(object_CO2_sensor.get_CO2() > 410)                                             // чтобы исключить значение на 0 и не показывать нереалистичные значения //
   {
     air_exchange_caclulated = 18000 / (object_CO2_sensor.get_CO2() - 400);          // этот коэффициент взят из таблички расчета со2 и актуален для одного человека находящегося в покое //
   }
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   String Message = ("Температура в комнате: " + String(object_Temp_Humidity_sensor.get_temp()) +\
                     "°C\nВлажность в комнате: " + String(object_Temp_Humidity_sensor.get_humidity()) +\
@@ -1786,17 +2004,25 @@ String TEMP_text_output()                          // Команда вывод�
                     "%\nKПД на вытяжку: " + String(b45) +\
                     "%\n\nC улицы: " + String(object_ds18b20_4.get_temp()) +\
                     "°C\nC батареи: " + String(object_ds18b20_5.get_temp()) +\
-                    "°C\nObъeдинeнный поток: " + String(object_ds18b20_6.get_temp()) +\
+                    "°C\nОбъeдинeнный поток: " + String(object_ds18b20_6.get_temp()) +\
                     "°C\n\nTeплoпoтepи от кровати до рекуп. и нагрев вентилятором: " + String(b82) +\
                     "°C\nTeплoпoтepи от улицы до рекуператора: " + String(b62) +\
                     "°C\n\n\n\n↓↓↓ТОЛЬКО ДЛЯ ХОЛОДОВ↓↓↓" + "\n\nBoздyxa c улицы: " + String(b61) +\
                     "%\nBoздyxa c батареи: " + String(b71) + "%");
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   return(Message);
 }
 
 String TEMP_excel_output()                         // Команда вывода данных для записи на SD карту и формирование лога для экселя //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   String Message = (String(object_Temp_Humidity_sensor.get_temp()) + "," +\
              String(object_Temp_Humidity_sensor.get_humidity()) + "," +\
              String(object_CO2_sensor.get_CO2()) + "," +\
