@@ -57,6 +57,10 @@ class class_users
 
     void send_message_second_chat(String input)
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       bot4.sendMessage(_id, input, "");
     }
 
@@ -216,6 +220,10 @@ class class_TimeDate                             // класс Даты и Вр�
       _TimeMIN = buf_Time_MIN.toInt();
       _TimeSEC = buf_Time_SEC.toInt();
 
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
       {
         buf_Date_MONTH = String("0" + buf_Date_MONTH);
@@ -240,6 +248,10 @@ class class_TimeDate                             // класс Даты и Вр�
       {
         buf_Time_SEC = String ("0" + buf_Time_SEC);
       }
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
 
       _DateMONTH = buf_Date_MONTH.toInt();
       _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
@@ -500,6 +512,10 @@ class class_Clock                                // класс часов //
       for (int i = 0; i < _array_length; i++)              // полученный результат переносим в основной массив ClockArray_main, чтобы при вызове следующих объектов сохранить индекс - храним его в ArrayGlobalCounter //
       {
         ClockArray_main [ArrayGlobalCounter++] = buf_array [i];
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
       }
     }
 
@@ -713,6 +729,10 @@ void loop()                                      // основной луп //
     Led_animation_down();
     clock_master();
 
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     restart_check();
     flag_every_minute_timer = false;
   }
@@ -727,6 +747,11 @@ void Message_from_Telegram_converter()           // преобразование
 
   String CHAT_IDcur = bot2.messages[0].chat_id;
   message_id_check(CHAT_IDcur);
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (message_intruder_flag == false)
   {
     String text = bot2.messages[0].text;
@@ -769,6 +794,10 @@ void Message_command_executer(String text)       // обработчик ком�
 
   else if (object_array_users[users_array_index].get_message_state() != 1)                                         // если MessageState != 1, то значит ожидаем ввод данных //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     switch (object_array_users[users_array_index].get_message_state())
     {
       case 104:                                // яркость //
@@ -843,6 +872,10 @@ void Message_command_executer(String text)       // обработчик ком�
 
   else                                                                // если MessageState == 1, то значит ожидаем команду //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     byte dividerIndex = text.indexOf('/');   // ищем индекс разделителя "/" //
     text = text.substring(dividerIndex + 1); // оставляем только команду "1" //
     int text_int = text.toInt();
@@ -1129,6 +1162,10 @@ void SYNCstart()                                 // получение темп�
 
   if(SYNCmessage.length() > 2)                                            // Проверка что вообще что-то пришло //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     byte dividerIndex = SYNCmessage.indexOf(';');
     String buf_SYNCtime = SYNCmessage.substring(0, dividerIndex);         // строка с временем для проверки рассинхронизации по времени
     String buf_second_part = SYNCmessage.substring(dividerIndex + 1);     // сохраняем вторую часть строки, чтобы разделить её на две нужные части
@@ -1361,6 +1398,10 @@ void Led_animation_error()                       // подсветка - оши�
         {
           array_LED_sconce [k+h+d] = CHSV(255, 255, 255);
         }
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
       }       
     }
     FastLED.delay(500);
@@ -1382,6 +1423,10 @@ void Led_animation_error()                       // подсветка - оши�
       {
         array_LED_sconce [k+d+low] = CHSV(255, 255, brightnes_local_val);
         array_LED_sconce [k+d+high] = CHSV(140, 255, brightnes_local_val);           
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
       }
       FastLED.delay(30);
     }
@@ -1613,6 +1658,10 @@ void clock_animation()                           // анимация часов 
     for(int i = 0; i < NUM_LEDS3; i++)
     {
       array_LED_clock [i] = CRGB((RGB_clock_night [0]*HSVval3cur*ClockArray_main [i]),(RGB_clock_night [1]*HSVval3cur*ClockArray_main [i]),(RGB_clock_night [2]*HSVval3cur*ClockArray_main [i]));
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
     }
     FastLED.delay(50);
   }
@@ -1643,6 +1692,10 @@ void clock_animation()                           // анимация часов 
     for(int i = 0; i < NUM_LEDS3; i++)
     {
       array_LED_clock [i] = CHSV(HSVhue_clock, HSVsat_clock_day, (HSVval3cur*ClockArray_main [i]));
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
     }
     FastLED.delay(20);
   }
