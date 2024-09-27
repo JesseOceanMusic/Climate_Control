@@ -675,6 +675,10 @@ class class_motor_main
 
     void calibrate_test()                            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
     {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       int buf_steps_GLOBAL = _steps_GLOBAL;
 
       if(calibrate_state == 2 && _calibrate_ERROR == false)                      // быстрая калибровка //
@@ -757,6 +761,10 @@ class class_motor_main
         }
       }
 
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       if (calibrate_state == 1 || calibrate_state == 2)                        // завершающий процесс любой калибровки //
       {
         if (_calibrate_ERROR == false)                                              // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
@@ -781,6 +789,10 @@ class class_motor_main
         object_array_users[0].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 14:00 до 14:30).");
       }
 
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       if (_daily_calibrate_flag == false)                                                                // поднимаем флаг калибровки //
       {
         if (object_TimeDate.get_TimeB() < 135959 || object_TimeDate.get_TimeB() > 143131)
@@ -795,6 +807,10 @@ class class_motor_main
         object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter));
         _doXsteps_counter = 0;
       }
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
 
       if (_step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)   // возвращает влаг обратно, чтобы отчет отправился на следующий день //
       {
@@ -1298,7 +1314,6 @@ void Message_from_Telegram_converter()           // преобразование
   #endif
 
   String CHAT_IDcur = bot1.messages[0].chat_id;
-  String text = bot1.messages[0].text;
   message_id_check(CHAT_IDcur);
 
   #ifdef Jesse_yield_enable
@@ -1307,6 +1322,8 @@ void Message_from_Telegram_converter()           // преобразование
     
   if (message_intruder_flag == false)
   {
+    String text = bot1.messages[0].text;
+
     byte dividerIndex = text.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
     String text_2nd_part = text.substring(dividerIndex + 1);            // записывает в text_2nd_part "JOArduinoChatBOT" //
     text = text.substring(0, dividerIndex);                             // записывает в text "/back" //
