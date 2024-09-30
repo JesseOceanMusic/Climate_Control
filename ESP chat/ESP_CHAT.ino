@@ -541,16 +541,19 @@ class class_motor_plus_knobs : public class_motor
     bool go_to_HIGH_limit()                       // Калибровка заслонки с улицы верхнее положение //
     {
       int steps_counter_limit4000 = 4000;                                      // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
+      _position_before_calibration = 0;
       digitalWrite(pin_DIR, dir_UP);
       while (digitalRead(pin_knob_HIGH) == 1 && steps_counter_limit4000 > 0)  // Идём вверх пока не сработает кнопка //
       {
         do_8_microsteps();
+        _position_before_calibration++;
       }
 
       digitalWrite(pin_DIR, dir_DOWN);
       for (int i = 0; i < _knob_space; i++)                                    // Отступаем обратно //
       {
         do_8_microsteps();
+        _position_before_calibration--;
       }
 
       return(_check_limit4000(steps_counter_limit4000));
@@ -560,13 +563,15 @@ class class_motor_plus_knobs : public class_motor
     {
       _LOWEST_position = 0;
       int steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-      
+      _position_before_calibration = 0;
+
       digitalWrite(pin_DIR, dir_DOWN);
       while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)         // Идём вниз пока не сработает кнопка //
       {
         do_8_microsteps();
         _LOWEST_position++;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
         steps_counter_limit4000--;
+        _position_before_calibration++;
       }
 
       digitalWrite(pin_DIR, dir_UP);
@@ -574,6 +579,7 @@ class class_motor_plus_knobs : public class_motor
       {
         do_8_microsteps();
         _LOWEST_position--;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+        _position_before_calibration--;
       }
 
       return(_check_limit4000(steps_counter_limit4000));
@@ -584,8 +590,14 @@ class class_motor_plus_knobs : public class_motor
       return(_LOWEST_position);
     }
 
+    int get_position_before_calibration()
+    {
+      return(_position_before_calibration);
+    }
   private:
     const byte _knob_space = 110;
+
+    int _position_before_calibration;
 
     int _LOWEST_position;
 
@@ -679,7 +691,11 @@ class class_motor_main
         yield();
       #endif
 
-      int buf_steps_GLOBAL = _steps_GLOBAL;
+      int buf_steps_GLOBAL = _steps_GLOBAL;                          // сохраняем положение заслонок до калибровки
+
+      int street_motor_position_before_calibration;                  // необходимо на случай, если ESP перезагрузилась и после калибровки нужно вернуть заслонки
+      int home_motor_position_before_calibration;                    // ↑↑↑
+      
 
       if(calibrate_state == 2 && _calibrate_ERROR == false)                      // быстрая калибровка //
       {
@@ -688,7 +704,9 @@ class class_motor_main
         if(digitalRead(pin_knob_LOW) == 1 && digitalRead(pin_knob_HIGH) == 1)
         {
           _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+          street_motor_position_before_calibration = object_STREET_motor_plus_knobs.get_position_before_calibration();
           _calibrate_ERROR = object_HOME_motor_plus_knobs.set_LOW_limit();
+          home_motor_position_before_calibration = object_HOME_motor_plus_knobs.get_position_before_calibration();
 
           _steps_GLOBAL = home_LOWEST_position_cur;
           object_array_users[0].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(_steps_GLOBAL));
@@ -769,7 +787,23 @@ class class_motor_main
       {
         if (_calibrate_ERROR == false)                                              // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
         {
-          int buf_steps_amount = buf_steps_GLOBAL - _steps_GLOBAL;
+          int buf_steps_amount = 0;
+
+          if(buf_steps_GLOBAL - _steps_GLOBAL != 0)                            // _steps_GLOBAL равно 0 при перезагрузке
+          {
+            buf_steps_amount = buf_steps_GLOBAL - _steps_GLOBAL;               
+          }
+          
+          else if(street_motor_position_before_calibration > 100)             // если _steps_GLOBAL равно 0, значит либо заслонки в нулевом положение, либо была перезагрузка... проверяем какая заслонка была до перезагрузки в другом положение и была ли вообще...
+          {
+            buf_steps_amount = 0 - street_motor_position_before_calibration - object_HOME_motor_plus_knobs.get_LOWEST_position();
+          }
+
+          else if(home_motor_position_before_calibration > 100)                // ↑↑↑
+          {
+            buf_steps_amount = 0 - home_motor_position_before_calibration;
+          }
+
           _doXsteps_counter = _doXsteps_counter + buf_steps_amount;              // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
           doXsteps_func(buf_steps_amount);
           calibrate_state = 0;
