@@ -54,7 +54,7 @@
 
 # Принципиальная схема
 
-Ссылка на схему [EasyEDA](https://easyeda.com/editor#id=|4718ba56e6354bcf96380dc9e2514969)
+Сделано с помощью EasyEDA.com
 
 ![Чертеж принципиальной схемы](images/Schematic_2024_10_01.png)
 
