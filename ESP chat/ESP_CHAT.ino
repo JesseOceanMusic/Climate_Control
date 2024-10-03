@@ -525,6 +525,10 @@ class class_motor
         digitalWrite(_pin_step, LOW);
         delay(1);                                    // delayMicroseconds на ESP даёт глюки из-за того, что в отличие от delay не даёт возможности делать прервывания и это накапливает ошибки и уводит ESP в перезагрузку //
       }
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
     }
 
   protected:
@@ -1329,14 +1333,18 @@ void loop()                                      // основной луп //
     humidifier();
     thermostat();
 
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
+    restart_check();
+    object_motor_main.calibrate_test();                                                  // проверяет нужна ли калибровка //
+
     flag_every_minute_timer = true;
   }
 
   if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)              // таймер каждую четную минуту //
   {
-    object_motor_main.calibrate_test();                                                  // проверяет нужна ли калибровка //
-
-    restart_check();
     flag_every_minute_timer = false;
   }
 }
