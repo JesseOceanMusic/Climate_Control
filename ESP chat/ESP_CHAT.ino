@@ -373,11 +373,11 @@ float b71;                                       // Процент воздух�
 class class_ds18b20                              // класс датчиков температура ds18b20 //
 {
   public:
-    class_ds18b20(bool alert_flag, byte ar0, byte ar1, byte ar2, byte ar3, byte ar4, byte ar5, byte ar6, byte ar7, String name)  // конструктор класса //
+    class_ds18b20(bool alert_flag, byte ar0, byte ar1, byte ar2, byte ar3, byte ar4, byte ar5, byte ar6, byte ar7, String name, float crit_temp_high_error)  // конструктор класса //
     {
       _crit_temp_low_alert = 4.00;
       _crit_temp_low_error = -45.00;
-      _crit_temp_high_error = 45.00;
+      _crit_temp_high_error = crit_temp_high_error;
 
       _alert_flag = alert_flag;
       _array_address[0]= ar0;
@@ -425,7 +425,8 @@ class class_ds18b20                              // класс датчиков 
     
     void set_crit_temp_low_alert(String crit_temp_low_alert)
     {
-      _crit_temp_low_alert = constrain(crit_temp_low_alert.toFloat(), -55, 55);
+      float buf_crit_temp_low_alert = crit_temp_low_alert.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      _crit_temp_low_alert = constrain(buf_crit_temp_low_alert, -55, 55);
       object_array_users[users_array_index].send_message("Оповещения будут приходить, если температура опустится ниже: " + String(_crit_temp_low_alert) + "°C");
     }
 
@@ -474,22 +475,23 @@ class class_ds18b20                              // класс датчиков 
 
 };
 
-class_ds18b20 object_ds18b20_0(true, 0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43,  "Рекуператор Приток (in): ");
-class_ds18b20 object_ds18b20_1(false, 0x28, 0x5C, 0x4E, 0x3C, 0x0, 0x0, 0x0, 0x5C, "Рекуператор Приток (out): ");
-class_ds18b20 object_ds18b20_2(false, 0x28, 0xAD, 0x18, 0x3A, 0x0, 0x0, 0x0, 0x19, "Рекуператор Вытяжка (in): ");
-class_ds18b20 object_ds18b20_3(true, 0x28, 0x27, 0xB5, 0x3E, 0x0, 0x0, 0x0, 0xED,  "Рекуператор Вытяжка (out): ");
-class_ds18b20 object_ds18b20_4(false, 0x28, 0xB6, 0x76, 0x39, 0x0, 0x0, 0x0, 0x81, "c Улицы: ");
-class_ds18b20 object_ds18b20_5(false, 0x28, 0xF, 0x2A, 0x3A, 0x0, 0x0, 0x0, 0x2C,  "с Батареи: ");
-class_ds18b20 object_ds18b20_6(false, 0x28, 0x5E, 0x81, 0x39, 0x0, 0x0, 0x0, 0xFE, "Объединенный поток: ");
+class_ds18b20 object_ds18b20_0(true, 0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43,  "Рекуператор Приток (in): ", 45);
+class_ds18b20 object_ds18b20_1(false, 0x28, 0x5C, 0x4E, 0x3C, 0x0, 0x0, 0x0, 0x5C, "Рекуператор Приток (out): ", 45);
+class_ds18b20 object_ds18b20_2(false, 0x28, 0xAD, 0x18, 0x3A, 0x0, 0x0, 0x0, 0x19, "Рекуператор Вытяжка (in): ", 45);
+class_ds18b20 object_ds18b20_3(true, 0x28, 0x27, 0xB5, 0x3E, 0x0, 0x0, 0x0, 0xED,  "Рекуператор Вытяжка (out): ", 45);
+class_ds18b20 object_ds18b20_4(false, 0x28, 0xB6, 0x76, 0x39, 0x0, 0x0, 0x0, 0x81, "Воздуховод c Улицы: ", 45);
+class_ds18b20 object_ds18b20_5(false, 0x28, 0xF, 0x2A, 0x3A, 0x0, 0x0, 0x0, 0x2C,  "Воздуховод с Батареи: ", 45);
+class_ds18b20 object_ds18b20_6(false, 0x28, 0x5E, 0x81, 0x39, 0x0, 0x0, 0x0, 0xFE, "Объединенный поток: ", 45);
+class_ds18b20 object_ds18b20_7(false, 0x28, 0x8C, 0x6B, 0x39, 0x0, 0x0, 0x0, 0x33, "Батарея: ", 105);
 
 
 /// ↓↓↓ УПРАВЛЕНИЕ ЗАСЛОНКАМИ ↓↓↓ ///
 
 
-float TempMain = 4.00;                           // температура термостата //
-float TempRange = 2.00;                          // чувствительность термостата //
+float TempMain = 21.00;                          // температура термостата //
+float TempRange = 0.5;                           // чувствительность термостата //
 int Step_Per_loop = 80;                          // количество шагов двигателя за цикл запуска термостата //
-int AirLowLimit = 25;                            // минимальный процент воздуха с улицы //
+int target_co2 = 600;                            // максимальное значение со2 в квартире //
 
 #define dir_UP LOW                     // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
 #define dir_DOWN HIGH                  // ↑↑↑ //
@@ -892,7 +894,7 @@ class class_motor_main
     bool _daily_calibrate_flag = false;               // флаг для таймера автоматической калибровки раз в сутки // стоит false, чтобы если включить ESP с 14 до 19 - не сработало две калибровки подряд (1 раз при включени и еще одна по таймеру) //
     bool _step_counter_Flag = 1;                      // флаг таймера для отправки отчета по количеству пройденных шагов за сутки // Нужно, чтобы быстро понять, не делают ли заслонки лишних движений летом //
     long _doXsteps_counter = 0;                       // счетчик количества шагов сделанных за день //
-    int _steps_GLOBAL = 3188;                         // одна переменная для определения положения ОБЕИХ заслонок // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+    int _steps_GLOBAL = home_LOWEST_position_const;                         // одна переменная для определения положения ОБЕИХ заслонок // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
 };
 
 class_motor_main object_motor_main;
@@ -954,13 +956,15 @@ class SHT41                                      // класс датчика SH
 
     void set_humidity_low_alert(String humidity_low_alert)
     {
-      _humidity_low_alert = constrain(humidity_low_alert.toFloat(), 0, 100);
+      float buf_humidity_low_alert = humidity_low_alert.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      _humidity_low_alert = constrain(buf_humidity_low_alert, 0, 100);
       object_array_users[users_array_index].send_message("Оповещения будут приходить, если влажность в квартире опустится ниже: " + String(_humidity_low_alert) + "%");
     }
 
     void set_humidity_high_alert (String humidity_high_alert)
     {
-      _humidity_high_alert = constrain(humidity_high_alert.toFloat(), 0, 100);
+      float buf_humidity_high_alert = humidity_high_alert.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      _humidity_high_alert = constrain(buf_humidity_high_alert, 0, 100);
       object_array_users[users_array_index].send_message("Оповещения будут приходить, если влажность в квартире поднимется выше: " + String(_humidity_high_alert) + "%");
     }
 
@@ -1264,13 +1268,14 @@ void setup()                                     // стандартная фу�
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
   object_TimeDate.set_UTC_time();
+  object_TimeDate.update_TimeDate();             // обновляем текущее время //
 
-  pinMode(pin_knob_LOW, INPUT_PULLUP);             // определяем пины // нижние концевики //
-  pinMode(pin_knob_HIGH, INPUT_PULLUP);            // ↑↑↑ // верхние концевики //
+  pinMode(pin_knob_LOW, INPUT_PULLUP);           // определяем пины // нижние концевики //
+  pinMode(pin_knob_HIGH, INPUT_PULLUP);          // ↑↑↑ // верхние концевики //
 
-  pinMode(pin_step_SREET, OUTPUT);                  // ↑↑↑ // шаговый двигатель заслонки с улицы //
-  pinMode(pin_step_HOME, OUTPUT);                    // ↑↑↑ // шаговый двигатель заслонки от батареи //
-  pinMode(pin_DIR, OUTPUT);                          // ↑↑↑ // общий пин direction (направление вращения двигателей) //
+  pinMode(pin_step_SREET, OUTPUT);               // ↑↑↑ // шаговый двигатель заслонки с улицы //
+  pinMode(pin_step_HOME, OUTPUT);                // ↑↑↑ // шаговый двигатель заслонки от батареи //
+  pinMode(pin_DIR, OUTPUT);                      // ↑↑↑ // общий пин direction (направление вращения двигателей) //
 
   pinMode(relay, OUTPUT);                        // определяем пин реле, как output //
   digitalWrite(relay, LOW);                      // на всякий случай выключаем реле при запуске //
@@ -1289,7 +1294,7 @@ void setup()                                     // стандартная фу�
 
   calibrate_state = 2;
   object_motor_main.calibrate_test();
-  
+
   send_alert("Я проснулся.");
 }
 
@@ -1437,30 +1442,38 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 104:                                // установка температуры термостата //
       {
-        TempMain = constrain(text.toFloat(), -55, 55);
+        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        TempMain = constrain(buf_text_float, -55, 55);
         object_array_users[users_array_index].send_message("Термостат установлен на температуру: " + String(TempMain) + "°C");
         break;      
       }
 
       case 105:                                // установка чувствительности термостата //
       {
-        TempRange = constrain(text.toFloat(), 0.2, 6);
+        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        TempRange = constrain(buf_text_float, 0.2, 6);
         object_array_users[users_array_index].send_message("Термостат включится/выключится при отклонение +- " + String(TempRange) + "°C");
         break;   
       }
 
-      case 106:                                // установка минимального процента воздуха с улицы //
+      case 107:                                // установка максимального уровня СО2 для заслонок //
       {
-        AirLowLimit = constrain(text.toInt(), 10, 100);
-        object_array_users[users_array_index].send_message("Минимальный процент воздуха с улицы: " + String(AirLowLimit) + "%");
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        target_co2 = constrain(buf_text_int, 500, 1000);
+        object_array_users[users_array_index].send_message("Максимальный уровень СО2 в квартире для заслонок (+-25): " + String(target_co2) + "ppm");
         break;  
       }
 
-      case 107:                                // установка шага заслонок //
+      case 108:                                // установка шага заслонок //
       {
-        Step_Per_loop = constrain(text.toInt(), 10, 1000);  // Ограничивает диапазон возможных значений //
-        float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
-        int calculation_buf2 = int(calculation_buf) * 2;
+        int calculation_buf2 = 999999;
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        Step_Per_loop = constrain(buf_text_int, 0, 1000);  // Ограничивает диапазон возможных значений //
+        if(Step_Per_loop != 0)
+        {
+          float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
+          calculation_buf2 = int(calculation_buf) * 2;
+        }
 
         String buf = "Шаг изменения положения заслонок: " + String(Step_Per_loop) +\
                      "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количества шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
@@ -1468,9 +1481,10 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 108:                                // ручное управление заслонками //
+      case 109:                                // ручное управление заслонками //
       {
-        int buf_steps_amount = constrain(text.toInt(), -10000, 10000);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        int buf_steps_amount = constrain(buf_text_int, -10000, 10000);
         object_array_users[users_array_index].send_message("Принял количество шагов: " + String(buf_steps_amount));
 
         object_motor_main.doXsteps_func(buf_steps_amount);
@@ -1480,7 +1494,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 111:                               // ручная установка крайнего нижнего положения заслонки с улицы //
       {
-        street_LOWEST_position_cur = constrain(text.toInt(), street_LOWEST_position_const, 0);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        street_LOWEST_position_cur = constrain(buf_text_int, street_LOWEST_position_const, 0);
         if (object_motor_main.get_steps_GLOBAL() < street_LOWEST_position_cur)
         {
           object_motor_main.doXsteps_func(street_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
@@ -1491,7 +1506,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 112:                               // ручная установка крайнего нижнего положения заслонки от батареи //
       {
-        home_LOWEST_position_cur = constrain(text.toInt(), 0, home_LOWEST_position_const);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        home_LOWEST_position_cur = constrain(buf_text_int, 0, home_LOWEST_position_const);
         if (object_motor_main.get_steps_GLOBAL() > home_LOWEST_position_cur)
         {
           object_motor_main.doXsteps_func(home_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
@@ -1502,7 +1518,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 113:                               // Установка желаемой влажности //
       {
-        room_humidity_target = constrain(text.toFloat(), 5, 65);
+        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        room_humidity_target = constrain(buf_text_float, 5, 65);
         float hum_buf_low = room_humidity_target - room_humidity_range;
         float hum_buf_high = room_humidity_target + room_humidity_range;
 
@@ -1515,7 +1532,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 114:                               // Установка чувствительности увлажнителя //
       {
-        room_humidity_range = constrain(text.toFloat(), 3, 20);
+        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        room_humidity_range = constrain(buf_text_float, 3, 20);
         float hum_buf_low = room_humidity_target - room_humidity_range;
         float hum_buf_high = room_humidity_target + room_humidity_range;
 
@@ -1627,33 +1645,38 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 106:                              // установка минимального процента воздуха с улицы //
+      case 107:                              // установка максимального уровня СО2 для заслонок //
       {
-        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки минимального процента воздуха с улицы +-5% (от 10 до 100):\n\nТекущее значение: " + String(AirLowLimit));
-        object_array_users[users_array_index].set_message_state(106);
-        break;
-      }
-
-      case 107:                              // установка шага заслонок //
-      {
-        float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
-        int calculation_buf2 = int(calculation_buf) * 2;
-
-        String buf = "Отправьте сообщение для установки шага изменения положения заслонок (от 10 до 1000):\n\nТекущее значение: " + String(Step_Per_loop) +\
-                     "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количество шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
-        object_array_users[users_array_index].send_message(buf);
+        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки максимального уровня СО2 в квартире для заслонок +-25 (от 500 до 1000):\n\nТекущее значение: " + String(target_co2) + "ppm");
         object_array_users[users_array_index].set_message_state(107);
         break;
       }
 
-      case 108:                              // ручное управление заслонками //
+      case 108:                              // установка шага заслонок //
       {
-        object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + object_motor_main.getMotorPositions());
+        int calculation_buf2 = 999999;
+
+        if(Step_Per_loop != 0)
+        {
+          float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
+          calculation_buf2 = int(calculation_buf) * 2;
+        }
+
+        String buf = "Отправьте сообщение для установки шага изменения положения заслонок (от 0 до 1000):\n\nТекущее значение: " + String(Step_Per_loop) +\
+                     "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количество шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
+        object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(108);
         break;
       }
 
-      case 109:                              // ручная инициализация быстрой калибровки заслонок //
+      case 109:                              // ручное управление заслонками //
+      {
+        object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + object_motor_main.getMotorPositions());
+        object_array_users[users_array_index].set_message_state(109);
+        break;
+      }
+
+      case 110:                              // ручная инициализация быстрой калибровки заслонок //
       {
         calibrate_state = 2;
         object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
@@ -1743,6 +1766,7 @@ void Message_command_executer(String text)       // обработчик ком�
             object_ds18b20_4.set_res_to_12_bit();
             object_ds18b20_5.set_res_to_12_bit();
             object_ds18b20_6.set_res_to_12_bit();
+            object_ds18b20_7.set_res_to_12_bit();
         }
         else
         {
@@ -1880,8 +1904,9 @@ void update_sensors_data_and_calculations()      // Опрос датчиков 
   object_ds18b20_1.update();            // Рекуператор Приток (out) //
   object_ds18b20_2.update();            // Рекуператор Вытяжка (in) //
   object_ds18b20_3.update();            // Рекуператор Вытяжка (out) //
-  object_ds18b20_4.update();            // c Улицы //
-  object_ds18b20_5.update();            // с Батареи //
+  object_ds18b20_4.update();            // Воздуховод c Улицы //
+  object_ds18b20_7.update();            // Батарея //
+  object_ds18b20_5.update();            // Воздуховод с Батареи //
   object_ds18b20_6.update();            // Объединенный поток //
 
   b62 = object_ds18b20_0.get_temp() - object_ds18b20_4.get_temp();                        // Теплопотери притока (если заслонки от батареи закрыты) //
@@ -1946,7 +1971,7 @@ void calculations_b61_b71(float buf_c1)          // расчет b61 (Проце
     yield();
   #endif
   
-  if ((object_ds18b20_5.get_temp() > object_ds18b20_4.get_temp() + 7) && object_ds18b20_6.get_temp() < object_ds18b20_5.get_temp() && object_ds18b20_6.get_temp() > object_ds18b20_4.get_temp())       // Условия при которых формула должна работать корректно //
+  if ((object_ds18b20_5.get_temp() > object_ds18b20_4.get_temp() + 7) && object_ds18b20_6.get_temp() < object_ds18b20_5.get_temp() && object_ds18b20_6.get_temp() > object_ds18b20_4.get_temp() && object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_const)       // Условия при которых формула должна работать корректно //
   {
     b61 = ((object_ds18b20_5.get_temp() - object_ds18b20_6.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;         // ПРОЦЕНТ ВОЗДУХА С УЛИЦЫ //
     b71 = ((object_ds18b20_6.get_temp() - object_ds18b20_4.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;         // ПРОЦЕНТ ВОЗДУХА С БАТАРЕИ //
@@ -1985,12 +2010,12 @@ void thermostat()                                // термостат //
     yield();
   #endif
 
-  if ((object_ds18b20_0.get_temp() < TempMain - TempRange) && (b61 > AirLowLimit + 5))
+  if ((object_ds18b20_0.get_temp() < TempMain - TempRange) && object_CO2_sensor.get_CO2() > (target_co2 - 25) && (object_ds18b20_7.get_temp() - object_Temp_Humidity_sensor.get_temp() > 9))
   {       
     object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
   }
 
-  if ((object_ds18b20_0.get_temp() > TempMain + TempRange) || (b61 < AirLowLimit - 5))
+  if ((object_ds18b20_0.get_temp() > TempMain + TempRange) || object_CO2_sensor.get_CO2() > (target_co2 + 25) || (object_ds18b20_7.get_temp() - object_Temp_Humidity_sensor.get_temp() < 6))
   {             
     object_motor_main.doXsteps_func(Step_Per_loop);                // положительные значения открываем улицу, закрываем батарею //
   }
@@ -2061,8 +2086,9 @@ String TEMP_text_output()                          // Команда вывод�
                     "°C\nPeкyп. Вытяжка (out): " + String(object_ds18b20_3.get_temp()) +\
                     "°C\n\nKПД на приток: " + String(b23) +\
                     "%\nKПД на вытяжку: " + String(b45) +\
-                    "%\n\nC улицы: " + String(object_ds18b20_4.get_temp()) +\
-                    "°C\nC батареи: " + String(object_ds18b20_5.get_temp()) +\
+                    "%\n\nВоздуховод с улицы: " + String(object_ds18b20_4.get_temp()) +\
+                    "°C\nБатарея: " + String(object_ds18b20_7.get_temp()) +\
+                    "°C\nВоздуховод с батареи: " + String(object_ds18b20_5.get_temp()) +\
                     "°C\nОбъeдинeнный поток: " + String(object_ds18b20_6.get_temp()) +\
                     "°C\n\nTeплoпoтepи от кровати до рекуп. и нагрев вентилятором: " + String(b82) +\
                     "°C\nTeплoпoтepи от улицы до рекуператора: " + String(b62) +\
@@ -2091,6 +2117,7 @@ String TEMP_excel_output()                         // Команда вывод�
              String(object_ds18b20_3.get_temp()) + "," +\
              String(b45) + "," + String(b23) + "," +\
              String(object_ds18b20_4.get_temp()) + "," +\
+             String(object_ds18b20_7.get_temp()) + "," +\
              String(object_ds18b20_5.get_temp()) + "," +\
              String(object_ds18b20_6.get_temp()) + "," +\
              String(b62) + "," + String(b82) + "," +\
