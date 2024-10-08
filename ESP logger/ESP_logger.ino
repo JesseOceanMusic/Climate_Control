@@ -348,14 +348,29 @@ bool flag_every_minute_timer = false;            // флаг для таймер
 
 ///↓↓↓ НОЧНОЙ РЕЖИМ ↓↓↓///
 
+enum                                             // NightTimeState enum
+{
+  NightTimeState_OFF        = 1,                 // Отключен
+  NightTimeState_MANUAL_ON  = 2,                 // Включен до следующего утра
+  NightTimeState_NEUTRAL    = 3,                 // В нейтральном положение, чтобы сработало сразу при включение
+  NightTimeState_ON         = 4,                 // Включен
+  NightTimeState_MANUAL_OFF = 5,                 // Отключен до следующего утра
+};
+
+enum                                             // NightTimeDimState enum
+{
+  NightTimeDimState_OFF                 = 1,
+  NightTimeDimState_BRIGHTNESS_DECREASE = 2,
+  NightTimeDimState_BRIGHTNESS_INCREASE = 3,
+};
 
 class class_NightTime                            // класс ночного режима //
 {
   public:
     class_NightTime()                            // конструктор класса //
     {
-      _NightTimeState = 3;
-      _NightTimeDimState = 1;
+      _NightTimeState = NightTimeState_NEUTRAL;
+      _NightTimeDimState = NightTimeDimState_OFF;
     }
 
     void update_NightTime()                      // метод проверки пора ли переключить ночной режим //
@@ -364,21 +379,21 @@ class class_NightTime                            // класс ночного р
         yield();
       #endif
 
-      if(_NightTimeState <= 3)                             // Ночной режим ВКЛ с 21:00 до 6:48 //
+      if(_NightTimeState <= NightTimeState_NEUTRAL)                       // Ночной режим ВКЛ с 21:00 до 6:48 //
       { 
         if (object_TimeDate.get_TimeB() > 210000 || object_TimeDate.get_TimeB() < 64800)
         {
-          _NightTimeDimState = 2;                     // Уменьшение яркости (займет 10 минут при стандартной яркости) //
-          _NightTimeState = 4;                        // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
+          _NightTimeDimState = NightTimeDimState_BRIGHTNESS_DECREASE;     // Уменьшение яркости (займет 10 минут при стандартной яркости) //
+          _NightTimeState = NightTimeState_ON;                            // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
         }
       }
 
-      if(_NightTimeState >= 3)                             // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
+      if(_NightTimeState >= NightTimeState_NEUTRAL)                       // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
       {
         if (object_TimeDate.get_TimeB() > 65000 && object_TimeDate.get_TimeB() < 205800)
         {    
-          _NightTimeDimState = 3;                     // Увеличение яркости (займет 40 минут при стандартной яркости) //
-          _NightTimeState = 1;                        // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
+          _NightTimeDimState = NightTimeDimState_BRIGHTNESS_INCREASE;     // Увеличение яркости (займет 40 минут при стандартной яркости) //
+          _NightTimeState = NightTimeState_OFF;                           // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
         }
       }
     }
@@ -497,16 +512,16 @@ class class_Clock                                // класс часов //
 
     void update()                                          // вызов update отдельных объектов должен быть обязательно последовательным, поскольку внутри есть сразу сложение в основной массив. если вызывать update у объектов в другой последовательности - отобразиться чушь. //
     { 
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
       byte buf_array [14];
 
       for (int i = 0; i < 7; i++)                          // по сути, этот цикл является очень примитивным дешифратором, где _key_ID это индекс строки в массиве _key_ARRAY, на которой лежит ключ//
       {    
         buf_array [i*2] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
         buf_array [(i*2)+1] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
       }
 
       for (int i = 0; i < _array_length; i++)              // полученный результат переносим в основной массив ClockArray_main, чтобы при вызове следующих объектов сохранить индекс - храним его в ArrayGlobalCounter //
@@ -604,6 +619,10 @@ bool skip_one_iteration = true;
 
 void restart_check()
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+  
   if(esp_restart_flag == true)
   {
     if(skip_one_iteration == true)
@@ -696,17 +715,8 @@ void loop()                                      // основной луп //
   
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)    // таймер каждую нечетную минуту //
   {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
     LOGtimer(); 
     NightTimeDim();
-    
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif    
-    
     Led_animation_up();
     clock_master();
     flag_every_minute_timer = true;
@@ -714,25 +724,11 @@ void loop()                                      // основной луп //
 
   if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)    // таймер каждую четную минуту //
   {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
     SYNCdata = "";                                                             // обнуляем стринг с датой, чтобы при ошибках синхронизации на часах не продолжали висеть старые данные //
     SYNCstart();
     NightTimeDim();
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
     Led_animation_down();
     clock_master();
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
     restart_check();
     flag_every_minute_timer = false;
   }
@@ -802,7 +798,8 @@ void Message_command_executer(String text)       // обработчик ком�
     {
       case 104:                                // яркость //
       {
-        HSVval1day = constrain(text.toInt(), 0, 255);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        HSVval1day = constrain(buf_text_int, 0, 255);
         HSVval2day = (HSVval1day/2);
         HSVval1cur = HSVval1day;
         HSVval2cur = HSVval2day;
@@ -813,7 +810,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 105:                                // яркость часов днём //
       {
-        HSVval3day = constrain(text.toInt(), 0, 255);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        HSVval3day = constrain(buf_text_int, 0, 255);
         HSVval3cur = HSVval3day;
         clock_master();
         object_array_users[users_array_index].send_message("Яркость часов днём установлена: " + String(HSVval3day));     
@@ -822,7 +820,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 106:                                // яркость часов ночью //  
       {
-        HSVval3night = constrain(text.toInt(), 0, 40);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        HSVval3night = constrain(buf_text_int, 0, 40);
         HSVval3cur = HSVval3night;
         clock_master();
         object_array_users[users_array_index].send_message("Яркость часов ночью установлена: " + String(HSVval3night));       
@@ -831,7 +830,8 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 110:                               // интервал смены цвета часов днём //  
       {
-        timer_min_hue_clock_target = constrain(text.toInt(), 1, 10080);
+        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        timer_min_hue_clock_target = constrain(buf_text_int, 1, 10080);
         object_array_users[users_array_index].send_message("Интервал смена цвета часов установлен: " + String(timer_min_hue_clock_target));
         break;   
       }
@@ -890,7 +890,7 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 102:                                                       // запрос первой строки excel //
       {
-        object_array_users[users_array_index].send_message("Дата и Время, Температура в комнате, Влажность в комнате, СО2, Рекуп. Приток (in), Рекуп. Приток (out), Рекуп. Вытяжка (in), Рекуп. Вытяжка (out), КПД рекуп. на приток (%), КПД рекуп. на вытяжку (%), C улицы (°C), C батареи (°C), Объединенный поток после фильтров(°C), Теплопотери от улицы до рекуператора (°C), Теплопотери воздухувода от кровати до рекуп. и нагрев вентилятором (°C), % воздуха c улицы, % воздуха c батареи, Текущее положение заслонок, Шагов за сутки (без учета калибровки)");
+        object_array_users[users_array_index].send_message("Дата и Время, Температура в комнате, Влажность в комнате, СО2, Рекуп. Приток (in), Рекуп. Приток (out), Рекуп. Вытяжка (in), Рекуп. Вытяжка (out), КПД рекуп. на приток (%), КПД рекуп. на вытяжку (%), Воздуховод с улицы (°C), Батарея (°C), Воздуховод с батареи (°C), Объединенный поток после фильтров(°C), Теплопотери от улицы до рекуператора (°C), Теплопотери воздухувода от кровати до рекуп. и нагрев вентилятором (°C), % воздуха c улицы, % воздуха c батареи, Текущее положение заслонок, Шагов за сутки (без учета калибровки)");
         break;
       }
 
@@ -899,8 +899,8 @@ void Message_command_executer(String text)       // обработчик ком�
         HSVval1cur = HSVval1day;
         HSVval2cur = HSVval2day;
         HSVval3cur = HSVval3day;
-        object_NightTime.set_NightTimeState(5);
-        object_NightTime.set_NightTimeDimState(1);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+        object_NightTime.set_NightTimeState(NightTimeState_MANUAL_OFF);
+        object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
         FillSolidMY();
         clock_master();
         object_array_users[users_array_index].send_message("Ночной режим принудительно ВЫКЛЮЧЕН до вечера (Ночью в любом случае не будет появляться анимация ошибки).");
@@ -912,8 +912,8 @@ void Message_command_executer(String text)       // обработчик ком�
         HSVval1cur = HSVval1night;
         HSVval2cur = HSVval2night;
         HSVval3cur = HSVval3night;
-        object_NightTime.set_NightTimeState(2);
-        object_NightTime.set_NightTimeDimState(1);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+        object_NightTime.set_NightTimeState(NightTimeState_MANUAL_ON);
+        object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
         FillSolidMY();
         clock_master();
         object_array_users[users_array_index].send_message("Ночной режим принудительно ВКЛЮЧЕН до утра (Днём перестанет появляться анимация ошибки).");
@@ -1295,7 +1295,7 @@ void NightTimeDim()                              // плавное измене�
       HSVval1cur = HSVval1night;
       HSVval2cur = HSVval2night;
       HSVval3cur = HSVval3night;
-      object_NightTime.set_NightTimeDimState(1);
+      object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);
     }    
   }
     
@@ -1310,7 +1310,7 @@ void NightTimeDim()                              // плавное измене�
       HSVval1cur = HSVval1day;
       HSVval2cur = HSVval2day;
       HSVval3cur = HSVval3day;
-      object_NightTime.set_NightTimeDimState(1);
+      object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);
     }     
   }
 }
@@ -1324,6 +1324,10 @@ void FillSolidMY()                               // заливка, чтобы �
 
 void Led_animation_up()                          // анимация подсветка "идёт наверх" //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   HSVhue1 = random(0, 255);
   HSVsat1 = random(50, 255);
   int depth = random(0, 10);
@@ -1333,6 +1337,10 @@ void Led_animation_up()                          // анимация подсв�
   {
     array_LED_line [i] = CHSV(HSVhue1, HSVsat_line_day, HSVval2cur);
     FastLED.delay(60);
+    
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
   }
 
   delay(500);
@@ -1341,6 +1349,10 @@ void Led_animation_up()                          // анимация подсв�
   {
     array_LED_sconce [i] = CHSV(HSVhue1, HSVsat1, HSVval1cur);
     FastLED.delay(20);
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
   }
 }
 
@@ -1354,6 +1366,10 @@ void Led_animation_down()                        // анимация подсв�
   {
     array_LED_sconce [i] = CHSV(HSVhue1, HSVsat1, HSVval1cur);
     FastLED.delay(20);
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
   }
 
   delay(500);
@@ -1362,6 +1378,10 @@ void Led_animation_down()                        // анимация подсв�
   {
     array_LED_line [i] = CHSV(HSVhue1, HSVsat_line_day, HSVval2cur);
     FastLED.delay(60);
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif    
   }
 }
 
@@ -1381,6 +1401,10 @@ void Led_animation_error()                       // подсветка - оши�
       array_LED_line [i] = CHSV(255, 255, 255);
     }
     FastLED.delay(16);
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif    
   }
 
   for(int i = 0; i < 12; i++)
@@ -1405,6 +1429,10 @@ void Led_animation_error()                       // подсветка - оши�
       }       
     }
     FastLED.delay(500);
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif    
   }
 
   delay(100);
@@ -1429,6 +1457,10 @@ void Led_animation_error()                       // подсветка - оши�
         #endif
       }
       FastLED.delay(30);
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif      
     }
     low++;
     high++;
@@ -1448,6 +1480,10 @@ void Led_animation_error()                       // подсветка - оши�
   {
     array_LED_line [i] = CHSV(0, 0, 0);
     FastLED.delay(20);
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif    
   }
 }
 
@@ -1674,6 +1710,10 @@ void clock_animation()                           // анимация часов 
       {
         array_LED_clock [i] = CHSV(HSVhue_clock, HSVsat_clock_day, (HSVval3cur*ClockArray_main [i]));
         FastLED.delay(20);
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif        
       }
     }
 
@@ -1683,6 +1723,10 @@ void clock_animation()                           // анимация часов 
       {
         array_LED_clock [i] = CHSV(HSVhue_clock, HSVsat_clock_day, (HSVval3cur*ClockArray_main [i]));
         FastLED.delay(20);
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
       }
     }
   }
