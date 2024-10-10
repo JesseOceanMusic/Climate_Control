@@ -488,24 +488,33 @@ class_ds18b20 object_ds18b20_7(false, 0x28, 0x8C, 0x6B, 0x39, 0x0, 0x0, 0x0, 0x3
 /// ↓↓↓ УПРАВЛЕНИЕ ЗАСЛОНКАМИ ↓↓↓ ///
 
 
-float TempMain = 21.00;                          // температура термостата //
-float TempRange = 0.5;                           // чувствительность термостата //
-int Step_Per_loop = 80;                          // количество шагов двигателя за цикл запуска термостата //
-int target_co2 = 600;                            // максимальное значение со2 в квартире //
+float TempMain       = 21.00;                          // температура термостата //
+float TempRange      =   0.5;                          // чувствительность термостата //
+int Step_Per_loop    =    80;                          // количество шагов двигателя за цикл запуска термостата //
+uint16_t target_co2  =   600;                          // максимальное значение со2 в квартире //
+bool use_recuperator =  true;
 
-#define dir_UP LOW                     // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
+#define dir_UP   LOW                   // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
 #define dir_DOWN HIGH                  // ↑↑↑ //
 
 const byte pin_step_SREET = 12;    //D6              // пин для управления шагами двигателя заслонки с улицы //
-const byte pin_step_HOME = 13;     //D7               // пин для управления шагами двигателя заслонки от батареи //
-const byte pin_DIR = 15;           //D8                     // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
-const byte pin_knob_LOW = 0;       //D3                // нижние концевики  //
-const byte pin_knob_HIGH = 2;      //D4               // верхние концевики //
+const byte pin_step_HOME  = 13;    //D7               // пин для управления шагами двигателя заслонки от батареи //
+const byte pin_DIR        = 15;    //D8                     // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
+const byte pin_knob_LOW   =  0;    //D3                // нижние концевики  //
+const byte pin_knob_HIGH  =  2;    //D4               // верхние концевики //
 
+namespace motor_calibration
+{
+  enum
+  {
+    idle  = 0,
+    full  = 1,
+    quick = 2,
+  }state;
+}
 
-byte calibrate_state;
 const int street_LOWEST_position_const = -2912;                    // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
-const int home_LOWEST_position_const = 3188;                       // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
+const int home_LOWEST_position_const   =  3188;                    // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
 int street_LOWEST_position_cur = street_LOWEST_position_const;     // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
 int home_LOWEST_position_cur = home_LOWEST_position_const;         // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
@@ -686,7 +695,7 @@ class class_motor_main
       if(digitalRead(pin_knob_HIGH) == 0 || digitalRead(pin_knob_LOW) == 0)                                          //Отправляем ошибку, если коснулись кнопки (не должны) //
       {
         send_alert("ERROR: Сработал концевик на заслонке.");
-        calibrate_state = 1;
+        motor_calibration::state = motor_calibration::full;
         global_ERROR_flag = true;
       }
     }
@@ -703,7 +712,7 @@ class class_motor_main
       int home_motor_position_before_calibration;                    // ↑↑↑
       
 
-      if(calibrate_state == 2 && _calibrate_ERROR == false)                      // быстрая калибровка //
+      if(motor_calibration::state == 2 && _calibrate_ERROR == false)                    // быстрая калибровка //
       {
         object_array_users[0].send_message_second_chat("Начинаю процесс быстрой калибровки.");
 
@@ -721,11 +730,11 @@ class class_motor_main
         else
         {
           send_alert("Быстрая калибровка невозможна. Концевик нажат.");
-          calibrate_state = 1;
+          motor_calibration::state = motor_calibration::full;
         }
       }
 
-      if(calibrate_state == 1 && _calibrate_ERROR == false)                        // полноценная калибровка //
+      if(motor_calibration::state == motor_calibration::full && _calibrate_ERROR == false)                    // полноценная калибровка //
       {
         object_array_users[0].send_message_second_chat("Начинаю процесс полноценной калибровки.");
 
@@ -789,7 +798,7 @@ class class_motor_main
         yield();
       #endif
 
-      if (calibrate_state == 1 || calibrate_state == 2)                        // завершающий процесс любой калибровки //
+      if (motor_calibration::state == motor_calibration::full || motor_calibration::state == motor_calibration::quick)                        // завершающий процесс любой калибровки //
       {
         if (_calibrate_ERROR == false)                                              // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
         {
@@ -812,7 +821,7 @@ class class_motor_main
 
           _doXsteps_counter = _doXsteps_counter + buf_steps_amount;              // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
           doXsteps_func(buf_steps_amount);
-          calibrate_state = 0;
+          motor_calibration::state = motor_calibration::idle;
           object_array_users[0].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
         }
         if (_calibrate_ERROR == true)                                              // если есть ошибки - отправляем уведомление о невозможности калибровки //
@@ -822,11 +831,15 @@ class class_motor_main
         }
       }
 
-      if (_daily_calibrate_flag == true && object_TimeDate.get_TimeB() > 140101 && object_TimeDate.get_TimeB() < 142929)      // автоматическая калибровка раз в сутки в 14:01 //
+      if (_daily_calibrate_flag == true && object_TimeDate.get_TimeB() > 150101 && object_TimeDate.get_TimeB() < 152929)      // автоматическая калибровка раз в сутки в 14:01 //
       {
-        calibrate_state = 2;
+        if(_doXsteps_counter != 0)                                             // если заслонки двигались хоть раз за пол дня - делаем калибровку //
+        {
+          motor_calibration::state = motor_calibration::quick;
+          object_array_users[0].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 15:00 до 15:30).");
+        }
+
         _daily_calibrate_flag = false;
-        object_array_users[0].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 14:00 до 14:30).");
       }
 
       #ifdef Jesse_yield_enable
@@ -835,7 +848,7 @@ class class_motor_main
 
       if (_daily_calibrate_flag == false)                                                                // поднимаем флаг калибровки //
       {
-        if (object_TimeDate.get_TimeB() < 135959 || object_TimeDate.get_TimeB() > 143131)
+        if (object_TimeDate.get_TimeB() < 145959 || object_TimeDate.get_TimeB() > 153131)
         {
           _daily_calibrate_flag = true;
         }
@@ -909,11 +922,11 @@ class_motor_main object_motor_main;
 
 Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
-float room_humidity_range = 5.00;                // чувствительность +- включения выключения увлажнителя //
+float room_humidity_range  =  5.00;              // чувствительность +- включения выключения увлажнителя //
 float room_humidity_target = 35.00;              // желаемая влажность //
 
 const int humidity_month_start = 9;              // первый месяц работы увлажнителя 9 (сентябрь) //
-const int humidity_month_end = 4;                // последний месяц работы увлажнителя 4 (апрель) //
+const int humidity_month_end   = 4;              // последний месяц работы увлажнителя 4 (апрель) //
 
 class SHT41                                      // класс датчика SHT41 температуры и влажности //
 {
@@ -1255,6 +1268,17 @@ void restart_check()
 
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
+void send_reset_info()
+{
+  String Jesse_reset_reason = ESP.getResetReason();
+  String Jesse_reset_info = ESP.getResetInfo();
+  String buf_message = "Причина перезагрузки: ";
+  buf_message += Jesse_reset_reason;
+  buf_message += "\nДополнительная информация: ";
+  buf_message += Jesse_reset_info;
+  send_alert(buf_message);
+}
+
 
 ///   ///   ///   ///   ///   ///   ///
 
@@ -1270,15 +1294,15 @@ void setup()                                     // стандартная фу�
   object_TimeDate.set_UTC_time();
   object_TimeDate.update_TimeDate();             // обновляем текущее время //
 
-  pinMode(pin_knob_LOW, INPUT_PULLUP);           // определяем пины // нижние концевики //
+  pinMode(pin_knob_LOW,  INPUT_PULLUP);          // определяем пины // нижние концевики //
   pinMode(pin_knob_HIGH, INPUT_PULLUP);          // ↑↑↑ // верхние концевики //
 
   pinMode(pin_step_SREET, OUTPUT);               // ↑↑↑ // шаговый двигатель заслонки с улицы //
-  pinMode(pin_step_HOME, OUTPUT);                // ↑↑↑ // шаговый двигатель заслонки от батареи //
-  pinMode(pin_DIR, OUTPUT);                      // ↑↑↑ // общий пин direction (направление вращения двигателей) //
+  pinMode(pin_step_HOME,  OUTPUT);               // ↑↑↑ // шаговый двигатель заслонки от батареи //
+  pinMode(pin_DIR,        OUTPUT);               // ↑↑↑ // общий пин direction (направление вращения двигателей) //
 
-  pinMode(relay, OUTPUT);                        // определяем пин реле, как output //
-  digitalWrite(relay, LOW);                      // на всякий случай выключаем реле при запуске //
+  pinMode     (relay,     OUTPUT);               // определяем пин реле, как output //
+  digitalWrite(relay,        LOW);               // на всякий случай выключаем реле при запуске //
 
   ds.begin();                                    // инициализация датчиков температуры по шине OneWire //
 
@@ -1292,10 +1316,11 @@ void setup()                                     // стандартная фу�
 
   scd4x.begin(Wire);                             // инициализация датчика СО2 по шине i2c //
 
-  calibrate_state = 2;
+  motor_calibration::state = motor_calibration::quick;
   object_motor_main.calibrate_test();
 
-  send_alert("Я проснулся.");
+  send_reset_info();
+  //send_alert("Я проснулся.");
 }
 
 void loop()                                      // основной луп //
@@ -1369,15 +1394,15 @@ void Message_from_Telegram_converter()           // преобразование
     
   if (message_intruder_flag == false)
   {
-    String text = bot1.messages[0].text;
+    String income_message = bot1.messages[0].text;
 
-    byte dividerIndex = text.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
-    String text_2nd_part = text.substring(dividerIndex + 1);            // записывает в text_2nd_part "JOArduinoChatBOT" //
-    text = text.substring(0, dividerIndex);                             // записывает в text "/back" //
+    byte dividerIndex_1 = income_message.indexOf('@');                         // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
+    String message_part_2 = income_message.substring(dividerIndex_1 + 1);      // записывает в message_part_2 "JOArduinoChatBOT" //
+    String message_part_1 = income_message.substring(0, dividerIndex_1);       // записывает в message_part_1 "/back" //
 
-    if (text_2nd_part != "JOArduinoLogsBOT")                            // если сообщение не для него, то пропускает его //
+    if (message_part_2 != "JOArduinoLogsBOT")                            // если сообщение не для него, то пропускает его //
     {
-      Message_command_executer(text);
+      Message_command_executer(message_part_1);
     }
   }
   
@@ -1569,9 +1594,10 @@ void Message_command_executer(String text)       // обработчик ком�
       yield();
     #endif
 
-    byte dividerIndex = text.indexOf('/');   // ищем индекс разделителя "/" //
-    text = text.substring(dividerIndex + 1); // оставляем только команду "1" //
-    int text_int = text.toInt();
+    byte dividerIndex_2 = text.indexOf('/');                     // ищем индекс разделителя "/" //
+    String buf_text = text.substring(dividerIndex_2 + 1);        // оставляем только команду "back" //
+
+    int text_int = buf_text.toInt();
 
     switch (text_int)                        // 1** команды доступные всем, 3** команды требующие доступ администратора //
     {
@@ -1678,7 +1704,7 @@ void Message_command_executer(String text)       // обработчик ком�
 
       case 110:                              // ручная инициализация быстрой калибровки заслонок //
       {
-        calibrate_state = 2;
+        motor_calibration::state = motor_calibration::quick;
         object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
         object_motor_main.calibrate_test();
         break;
@@ -1694,7 +1720,7 @@ void Message_command_executer(String text)       // обработчик ком�
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
-          calibrate_state = 1;
+          motor_calibration::state = motor_calibration::full;
           object_array_users[users_array_index].send_message("Принял запрос на полноценную калибровку.");
           object_motor_main.calibrate_test();
         }
@@ -1927,19 +1953,17 @@ void calculations_b23(float buf_c1)              // расчет b23 (Эффек
     yield();
   #endif
 
-  if (object_ds18b20_0.get_temp() == object_ds18b20_1.get_temp())                                  // Исключить деление на 0 //
+  b23 = 0;
+
+  if (buf_c1 < -1 || buf_c1 > 1)                                          // чтобы не считать КПД при разницах Притока и вытяжки меньше 1°C //
   {
-    b23 = 0;
-  }
-  
-  else if (buf_c1 > -1 && buf_c1 < 1)                    //  Чтобы не считать КПД при разницах Притока и вытяжки меньше 1°C //
-  {
-    b23 = 0;
-  }
-  
-  else                                           // ЭФФЕКТИВНОСТЬ РЕКУПЕРАЦИИ НА ПРИТОК //
-  {
-    b23 = 100 / (object_ds18b20_2.get_temp() - object_ds18b20_0.get_temp()) * (object_ds18b20_1.get_temp() - object_ds18b20_0.get_temp());
+    if (object_ds18b20_2.get_temp() != object_ds18b20_0.get_temp())       // Исключить деление на 0 //
+    {
+      if (object_ds18b20_1.get_temp() != object_ds18b20_0.get_temp())     // Исключить деление на 0 //
+      {
+        b23 = 100 / (object_ds18b20_2.get_temp() - object_ds18b20_0.get_temp()) * (object_ds18b20_1.get_temp() - object_ds18b20_0.get_temp());  // ЭФФЕКТИВНОСТЬ РЕКУПЕРАЦИИ НА ПРИТОК //
+      }      
+    }
   }
 }
 
@@ -1949,19 +1973,17 @@ void calculations_b45(float buf_c1)              // расчет b45 (Эффек
     yield();
   #endif
 
-  if (object_ds18b20_2.get_temp() == object_ds18b20_3.get_temp())                                  // Исключить деление на 0 //
-  {
-    b45 = 0;
-  }
+  b45 = 0;
 
-  else if (buf_c1 > -1 && buf_c1 < 1)                    //  Чтобы не считать КПД при разницах Притока и вытяжки меньше 1°C //
+  if (buf_c1 < -1 || buf_c1 > 1)                                          //  Чтобы не считать КПД при разницах Притока и вытяжки меньше 1°C //
   {
-    b45 = 0;
-  }
-
-  else                                           // ЭФФЕКТИВНОСТЬ РЕКУПЕРАЦИИ НА ВЫТЯЖКУ //
-  {
-    b45 = 100 / (object_ds18b20_2.get_temp() - object_ds18b20_0.get_temp()) * (object_ds18b20_2.get_temp() - object_ds18b20_3.get_temp());
+    if (object_ds18b20_2.get_temp() != object_ds18b20_0.get_temp())       // Исключить деление на 0 //
+    {
+      if (object_ds18b20_2.get_temp() != object_ds18b20_3.get_temp())     // Исключить деление на 0 //
+      {
+        b45 = 100 / (object_ds18b20_2.get_temp() - object_ds18b20_0.get_temp()) * (object_ds18b20_2.get_temp() - object_ds18b20_3.get_temp());  // ЭФФЕКТИВНОСТЬ РЕКУПЕРАЦИИ НА ВЫТЯЖКУ //
+      }
+    }
   }
 }
 
@@ -1971,16 +1993,25 @@ void calculations_b61_b71(float buf_c1)          // расчет b61 (Проце
     yield();
   #endif
   
-  if ((object_ds18b20_5.get_temp() > object_ds18b20_4.get_temp() + 7) && object_ds18b20_6.get_temp() < object_ds18b20_5.get_temp() && object_ds18b20_6.get_temp() > object_ds18b20_4.get_temp() && object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_const)       // Условия при которых формула должна работать корректно //
-  {
-    b61 = ((object_ds18b20_5.get_temp() - object_ds18b20_6.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;         // ПРОЦЕНТ ВОЗДУХА С УЛИЦЫ //
-    b71 = ((object_ds18b20_6.get_temp() - object_ds18b20_4.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;         // ПРОЦЕНТ ВОЗДУХА С БАТАРЕИ //
-  }
+  b61 = 0;
+  b71 = 0;
 
-  else
+  if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_const)            // заслонка от батареи не закрыта
   {
-    b61 = 0;
-    b71 = 0;
+    if(object_ds18b20_6.get_temp() > object_ds18b20_4.get_temp())                   // объединенный поток теплее воздуха с улицы 
+    {
+      if(object_ds18b20_6.get_temp() < object_ds18b20_5.get_temp())                 // объединенный поток холоднее воздуха с батареи
+      {
+        if(object_Temp_Humidity_sensor.get_temp() > object_ds18b20_4.get_temp())    // в квартире теплее, чем на улице
+        {
+          if(object_ds18b20_5.get_temp() != object_ds18b20_4.get_temp())            // исключить деление на 0
+          {
+            b61 = ((object_ds18b20_5.get_temp() - object_ds18b20_6.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;    // ПРОЦЕНТ ВОЗДУХА С УЛИЦЫ
+            b71 = ((object_ds18b20_6.get_temp() - object_ds18b20_4.get_temp()) / (object_ds18b20_5.get_temp() - object_ds18b20_4.get_temp())) * 100;    // ПРОЦЕНТ ВОЗДУХА С БАТАРЕИ
+          }
+        }
+      }
+    }
   }
 }
 
@@ -2010,14 +2041,39 @@ void thermostat()                                // термостат //
     yield();
   #endif
 
-  if ((object_ds18b20_0.get_temp() < TempMain - TempRange) && object_CO2_sensor.get_CO2() > (target_co2 - 25) && (object_ds18b20_7.get_temp() - object_Temp_Humidity_sensor.get_temp() > 9))
-  {       
-    object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
+  if(object_ds18b20_7.get_temp() > (object_Temp_Humidity_sensor.get_temp() + 10))     // Если температура батареи больше температуры в комнате на 10 градусов
+  {
+    use_recuperator = false;
+  }
+  else if(object_ds18b20_7.get_temp() < (object_Temp_Humidity_sensor.get_temp() + 7))   // Если температуры батареи меньше температуры в комнате на 7 градусов
+  {
+    use_recuperator = true;
   }
 
-  if ((object_ds18b20_0.get_temp() > TempMain + TempRange) || object_CO2_sensor.get_CO2() > (target_co2 + 25) || (object_ds18b20_7.get_temp() - object_Temp_Humidity_sensor.get_temp() < 6))
-  {             
-    object_motor_main.doXsteps_func(Step_Per_loop);                // положительные значения открываем улицу, закрываем батарею //
+  if(use_recuperator == false)
+  {
+    if (object_ds18b20_0.get_temp() < (TempMain - TempRange))          // Если рекуператор приток (in) меньше ...
+    {
+      if(object_CO2_sensor.get_CO2() < (target_co2 - 25))              // Если СО2 меньше, чем...
+      {
+        object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
+      }
+    }
+
+    if (object_ds18b20_0.get_temp() > (TempMain + TempRange))          // Если рекуператор приток (in) больше ...
+    {             
+      object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
+    }
+
+    else if (object_CO2_sensor.get_CO2() > (target_co2 + 25))          // Если СO2 больше, чем...
+    {             
+      object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
+    }
+  }
+
+  else if(use_recuperator == true)
+  {
+    object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //    
   }
 }
 
@@ -2059,7 +2115,7 @@ void SYNCstart()                                 // Отправка темпе�
   }
 }
 
-String TEMP_text_output()                          // Команда вывода данных в текстовом виде //
+String TEMP_text_output()                        // Команда вывода данных в текстовом виде //
 {
   #ifdef Jesse_yield_enable
     yield();
@@ -2102,7 +2158,7 @@ String TEMP_text_output()                          // Команда вывод�
   return(Message);
 }
 
-String TEMP_excel_output()                         // Команда вывода данных для записи на SD карту и формирование лога для экселя //
+String TEMP_excel_output()                       // Команда вывода данных для записи на SD карту и формирование лога для экселя //
 {
   #ifdef Jesse_yield_enable
     yield();
