@@ -348,29 +348,38 @@ bool flag_every_minute_timer = false;            // флаг для таймер
 
 ///↓↓↓ НОЧНОЙ РЕЖИМ ↓↓↓///
 
-enum                                             // NightTimeState enum
+namespace NightTime
 {
-  NightTimeState_OFF        = 1,                 // Отключен
-  NightTimeState_MANUAL_ON  = 2,                 // Включен до следующего утра
-  NightTimeState_NEUTRAL    = 3,                 // В нейтральном положение, чтобы сработало сразу при включение
-  NightTimeState_ON         = 4,                 // Включен
-  NightTimeState_MANUAL_OFF = 5,                 // Отключен до следующего утра
-};
+  namespace State
+  {
+    enum
+    {
+      OFF        = 1,                 // Отключен
+      MANUAL_ON  = 2,                 // Включен до следующего утра
+      NEUTRAL    = 3,                 // В нейтральном положение, чтобы сработало сразу при включение
+      ON         = 4,                 // Включен
+      MANUAL_OFF = 5,                 // Отключен до следующего утра    
+    };
+  }
+  namespace DimState
+  {
+    enum
+    {
+      OFF      = 1,
+      DECREASE = 2,
+      INCREASE = 3,
+    };
+  }
+}
 
-enum                                             // NightTimeDimState enum
-{
-  NightTimeDimState_OFF                 = 1,
-  NightTimeDimState_BRIGHTNESS_DECREASE = 2,
-  NightTimeDimState_BRIGHTNESS_INCREASE = 3,
-};
 
 class class_NightTime                            // класс ночного режима //
 {
   public:
     class_NightTime()                            // конструктор класса //
     {
-      _NightTimeState = NightTimeState_NEUTRAL;
-      _NightTimeDimState = NightTimeDimState_OFF;
+      _NightTimeState = NightTime::State::NEUTRAL;
+      _NightTimeDimState = NightTime::DimState::OFF;
     }
 
     void update_NightTime()                      // метод проверки пора ли переключить ночной режим //
@@ -379,21 +388,21 @@ class class_NightTime                            // класс ночного р
         yield();
       #endif
 
-      if(_NightTimeState <= NightTimeState_NEUTRAL)                       // Ночной режим ВКЛ с 21:00 до 6:48 //
+      if(_NightTimeState <= NightTime::State::NEUTRAL)                       // Ночной режим ВКЛ с 21:00 до 6:48 //
       { 
         if (object_TimeDate.get_TimeB() > 210000 || object_TimeDate.get_TimeB() < 64800)
         {
-          _NightTimeDimState = NightTimeDimState_BRIGHTNESS_DECREASE;     // Уменьшение яркости (займет 10 минут при стандартной яркости) //
-          _NightTimeState = NightTimeState_ON;                            // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
+          _NightTimeDimState = NightTime::DimState::DECREASE;     // Уменьшение яркости (займет 10 минут при стандартной яркости) //
+          _NightTimeState = NightTime::State::ON;                            // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
         }
       }
 
-      if(_NightTimeState >= NightTimeState_NEUTRAL)                       // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
+      if(_NightTimeState >= NightTime::State::NEUTRAL)                       // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
       {
         if (object_TimeDate.get_TimeB() > 65000 && object_TimeDate.get_TimeB() < 205800)
         {    
-          _NightTimeDimState = NightTimeDimState_BRIGHTNESS_INCREASE;     // Увеличение яркости (займет 40 минут при стандартной яркости) //
-          _NightTimeState = NightTimeState_OFF;                           // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
+          _NightTimeDimState = NightTime::DimState::INCREASE;     // Увеличение яркости (займет 40 минут при стандартной яркости) //
+          _NightTimeState = NightTime::State::OFF;                           // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
         }
       }
     }
@@ -653,6 +662,16 @@ void restart_check()
 
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
+void send_reset_info()
+{
+  String Jesse_reset_reason = ESP.getResetReason();
+  String Jesse_reset_info = ESP.getResetInfo();
+  String buf_message = "Причина перезагрузки: ";
+  buf_message += Jesse_reset_reason;
+  buf_message += "\nДополнительная информация: ";
+  buf_message += Jesse_reset_info;
+  send_alert(buf_message);
+}
 
 ///   ///   ///   ///   ///   ///   ///
 
@@ -672,7 +691,8 @@ void setup()                                     // стандартная фу�
   FastLED.addLeds<WS2812, DATA_PIN3, GRB>(array_LED_clock, NUM_LEDS3);    // определяем лед ленту ЧАСОВ //
   FastLED.setBrightness(255);                                             // задаём глобальную яркость всех лент, как максимальную //
 
-  send_alert("Я проснулся.");
+  send_reset_info();
+  //send_alert("Я проснулся.");
 }
 
 void loop()                                      // основной луп //
@@ -750,15 +770,15 @@ void Message_from_Telegram_converter()           // преобразование
 
   if (message_intruder_flag == false)
   {
-    String text = bot2.messages[0].text;
+    String income_message = bot2.messages[0].text;
 
-    byte dividerIndex = text.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
-    String text_2nd_part = text.substring(dividerIndex + 1);            // записывает в text_2nd_part "JOArduinoChatBOT" //
-    text = text.substring(0, dividerIndex);                             // записывает в text "/back" //
+    byte dividerIndex_1 = income_message.indexOf('@');                         // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
+    String message_part_2 = income_message.substring(dividerIndex_1 + 1);      // записывает в message_part_2 "JOArduinoChatBOT" //
+    String message_part_1 = income_message.substring(0, dividerIndex_1);       // записывает в message_part_1 "/back" //
 
-    if (text_2nd_part != "JOArduinoChatBOT")                            // если сообщение не для него, то пропускает его //
+    if (message_part_2 != "JOArduinoChatBOT")                            // если сообщение не для него, то пропускает его //
     {
-      Message_command_executer(text);
+      Message_command_executer(message_part_1);
     }
   }
 
@@ -876,9 +896,10 @@ void Message_command_executer(String text)       // обработчик ком�
       yield();
     #endif
 
-    byte dividerIndex = text.indexOf('/');   // ищем индекс разделителя "/" //
-    text = text.substring(dividerIndex + 1); // оставляем только команду "1" //
-    int text_int = text.toInt();
+    byte dividerIndex_2 = text.indexOf('/');                     // ищем индекс разделителя "/" //
+    String buf_text = text.substring(dividerIndex_2 + 1);        // оставляем только команду "back" //
+
+    int text_int = buf_text.toInt();
 
     switch (text_int)
     {
@@ -899,8 +920,8 @@ void Message_command_executer(String text)       // обработчик ком�
         HSVval1cur = HSVval1day;
         HSVval2cur = HSVval2day;
         HSVval3cur = HSVval3day;
-        object_NightTime.set_NightTimeState(NightTimeState_MANUAL_OFF);
-        object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+        object_NightTime.set_NightTimeState(NightTime::State::MANUAL_OFF);
+        object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
         FillSolidMY();
         clock_master();
         object_array_users[users_array_index].send_message("Ночной режим принудительно ВЫКЛЮЧЕН до вечера (Ночью в любом случае не будет появляться анимация ошибки).");
@@ -912,8 +933,8 @@ void Message_command_executer(String text)       // обработчик ком�
         HSVval1cur = HSVval1night;
         HSVval2cur = HSVval2night;
         HSVval3cur = HSVval3night;
-        object_NightTime.set_NightTimeState(NightTimeState_MANUAL_ON);
-        object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+        object_NightTime.set_NightTimeState(NightTime::State::MANUAL_ON);
+        object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
         FillSolidMY();
         clock_master();
         object_array_users[users_array_index].send_message("Ночной режим принудительно ВКЛЮЧЕН до утра (Днём перестанет появляться анимация ошибки).");
@@ -1295,7 +1316,7 @@ void NightTimeDim()                              // плавное измене�
       HSVval1cur = HSVval1night;
       HSVval2cur = HSVval2night;
       HSVval3cur = HSVval3night;
-      object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);
+      object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);
     }    
   }
     
@@ -1310,7 +1331,7 @@ void NightTimeDim()                              // плавное измене�
       HSVval1cur = HSVval1day;
       HSVval2cur = HSVval2day;
       HSVval3cur = HSVval3day;
-      object_NightTime.set_NightTimeDimState(NightTimeDimState_OFF);
+      object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);
     }     
   }
 }
