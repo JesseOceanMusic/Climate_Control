@@ -493,7 +493,7 @@ float TempRange      =   0.5;                          // чувствитель
 int Step_Per_loop    =    80;                          // количество шагов двигателя за цикл запуска термостата //
 uint16_t target_co2  =   600;                          // максимальное значение со2 в квартире //
 bool use_recuperator =  true;
-
+#define recuperator_button A0
 #define dir_UP   LOW                   // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
 #define dir_DOWN HIGH                  // ↑↑↑ //
 
@@ -1340,14 +1340,16 @@ void loop()                                      // основной луп //
     test_timer = millis();
   #endif
 
-  object_TimeDate.update_TimeDate();                                      // обновляем текущее время //
+  object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
-  if (bot1.getUpdates(bot1.last_message_received + 1) != 0)               // если есть новые сообщения обрабатываем одно //
+  recuperator_button_check();                                                       // проверяем положение выключателя //
+
+  if (bot1.getUpdates(bot1.last_message_received + 1) != 0)                         // если есть новые сообщения обрабатываем одно //
   {
     Message_from_Telegram_converter();
   }
 
-  if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)              // таймер каждую нечетную минуту //
+  if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)         // таймер каждую нечетную минуту //
   {
     #ifdef Jesse_yield_enable
       yield();
@@ -1373,7 +1375,7 @@ void loop()                                      // основной луп //
     flag_every_minute_timer = true;
   }
 
-  if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)              // таймер каждую четную минуту //
+  if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)         // таймер каждую четную минуту //
   {
     flag_every_minute_timer = false;
   }
@@ -2035,20 +2037,40 @@ void humidifier()                                // увлажнитель //
   }
 }
 
+void recuperator_button_check()
+{
+  if(analogRead(recuperator_button) < 50 && use_recuperator == true)
+  {
+    String recuperator_info_message = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха.";
+    recuperator_info_message += " Чтобы было положительное давление в квартире и пыль и запахи не затягивало из щелей в стенах.";
+    recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
+
+    use_recuperator = false;
+    send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
+  }
+
+  else if(analogRead(recuperator_button) > 975 && use_recuperator == false)
+  {
+    String recuperator_info_message_2 = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
+    recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
+
+    use_recuperator = true;
+    send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);
+  }
+
+  if(use_recuperator == true)
+  {
+    if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_cur)
+    {
+      object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //          
+    }
+  }
+}
 void thermostat()                                // термостат //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
-
-  if(object_ds18b20_7.get_temp() > (object_Temp_Humidity_sensor.get_temp() + 10))     // Если температура батареи больше температуры в комнате на 10 градусов
-  {
-    use_recuperator = false;
-  }
-  else if(object_ds18b20_7.get_temp() < (object_Temp_Humidity_sensor.get_temp() + 7))   // Если температуры батареи меньше температуры в комнате на 7 градусов
-  {
-    use_recuperator = true;
-  }
 
   if(use_recuperator == false)
   {
@@ -2060,7 +2082,7 @@ void thermostat()                                // термостат //
       }
     }
 
-    if (object_ds18b20_0.get_temp() > (TempMain + TempRange))          // Если рекуператор приток (in) больше ...
+    else if (object_ds18b20_0.get_temp() > (TempMain + TempRange))          // Если рекуператор приток (in) больше ...
     {             
       object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
     }
@@ -2069,11 +2091,6 @@ void thermostat()                                // термостат //
     {             
       object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
     }
-  }
-
-  else if(use_recuperator == true)
-  {
-    object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //    
   }
 }
 
