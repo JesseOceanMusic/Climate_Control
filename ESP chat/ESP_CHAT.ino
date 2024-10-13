@@ -363,6 +363,7 @@ DallasTemperature ds(&OneWire);                  // ↑↑↑ //
 
 float b23;                                       // Эффективность рекуперации на приток //
 float b45;                                       // Эффективность рекуперации на вытяжку //
+float real_efficiency;
 
 float b62;                                       // Теплопотери притока (если заслонки от батареи закрыты) //
 float b82;                                       // Теплопотери воздухувода от кровати до рекуператора и нагрев вентилятором //
@@ -491,8 +492,8 @@ class_ds18b20 object_ds18b20_7(false, 0x28, 0x8C, 0x6B, 0x39, 0x0, 0x0, 0x0, 0x3
 float TempMain       = 21.00;                          // температура термостата //
 float TempRange      =   0.5;                          // чувствительность термостата //
 int Step_Per_loop    =    80;                          // количество шагов двигателя за цикл запуска термостата //
-uint16_t target_co2  =   600;                          // максимальное значение со2 в квартире //
-bool use_recuperator =  true;
+uint16_t target_co2  =   700;                          // максимальное значение со2 в квартире //
+bool use_recuperator;
 #define recuperator_button A0
 #define dir_UP   LOW                   // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
 #define dir_DOWN HIGH                  // ↑↑↑ //
@@ -577,11 +578,11 @@ class class_motor_plus_knobs : public class_motor
     bool set_LOW_limit()                        // Калибровка заслонки с улицы нижнее положение //
     {
       _LOWEST_position = 0;
-      int steps_counter_limit4000 = 4000;                                         // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
+      int steps_counter_limit4000 = 4000;                                      // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
       _position_before_calibration = 0;
 
       digitalWrite(pin_DIR, dir_DOWN);
-      while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)         // Идём вниз пока не сработает кнопка //
+      while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)    // Идём вниз пока не сработает кнопка //
       {
         do_8_microsteps();
         _LOWEST_position++;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
@@ -700,7 +701,7 @@ class class_motor_main
       }
     }
 
-    void calibrate_test()                            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
+    void calibrate_test(bool is_it_reboot)                            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
     {
       #ifdef Jesse_yield_enable
         yield();
@@ -718,12 +719,24 @@ class class_motor_main
 
         if(digitalRead(pin_knob_LOW) == 1 && digitalRead(pin_knob_HIGH) == 1)
         {
-          _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
-          street_motor_position_before_calibration = object_STREET_motor_plus_knobs.get_position_before_calibration();
-          _calibrate_ERROR = object_HOME_motor_plus_knobs.set_LOW_limit();
-          home_motor_position_before_calibration = object_HOME_motor_plus_knobs.get_position_before_calibration();
+          if(use_recuperator == true)
+          {
+            _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+            street_motor_position_before_calibration = object_STREET_motor_plus_knobs.get_position_before_calibration();
+            _calibrate_ERROR = object_HOME_motor_plus_knobs.set_LOW_limit();
+            home_motor_position_before_calibration = object_HOME_motor_plus_knobs.get_position_before_calibration();
+            _steps_GLOBAL = home_LOWEST_position_cur;
+          }
 
-          _steps_GLOBAL = home_LOWEST_position_cur;
+          else
+          {
+            _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+            street_motor_position_before_calibration = object_STREET_motor_plus_knobs.get_position_before_calibration();
+            _calibrate_ERROR = object_HOME_motor_plus_knobs.go_to_HIGH_limit();
+            home_motor_position_before_calibration = object_HOME_motor_plus_knobs.get_position_before_calibration();          
+            _steps_GLOBAL = 0;
+          }
+
           object_array_users[0].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(_steps_GLOBAL));
         }
         
@@ -800,25 +813,28 @@ class class_motor_main
 
       if (motor_calibration::state == motor_calibration::full || motor_calibration::state == motor_calibration::quick)                        // завершающий процесс любой калибровки //
       {
-        if (_calibrate_ERROR == false)                                              // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
+        if (_calibrate_ERROR == false)                                         // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
         {
           int buf_steps_amount = 0;
 
-          if(buf_steps_GLOBAL - _steps_GLOBAL != 0)                            // _steps_GLOBAL равно 0 при перезагрузке
+          if(is_it_reboot == false)
           {
-            buf_steps_amount = buf_steps_GLOBAL - _steps_GLOBAL;               
+            buf_steps_amount = buf_steps_GLOBAL - _steps_GLOBAL;
+          }
+
+          else
+          {
+            if(street_motor_position_before_calibration > 50)
+            {
+              buf_steps_amount = 0 - street_motor_position_before_calibration - object_HOME_motor_plus_knobs.get_LOWEST_position();
+            }
+
+            else if(home_motor_position_before_calibration > 50)
+            {
+              buf_steps_amount = 0 - home_motor_position_before_calibration;
+            }
           }
           
-          else if(street_motor_position_before_calibration > 100)             // если _steps_GLOBAL равно 0, значит либо заслонки в нулевом положение, либо была перезагрузка... проверяем какая заслонка была до перезагрузки в другом положение и была ли вообще...
-          {
-            buf_steps_amount = 0 - street_motor_position_before_calibration - object_HOME_motor_plus_knobs.get_LOWEST_position();
-          }
-
-          else if(home_motor_position_before_calibration > 100)                // ↑↑↑
-          {
-            buf_steps_amount = 0 - home_motor_position_before_calibration;
-          }
-
           _doXsteps_counter = _doXsteps_counter + buf_steps_amount;              // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
           doXsteps_func(buf_steps_amount);
           motor_calibration::state = motor_calibration::idle;
@@ -1316,11 +1332,12 @@ void setup()                                     // стандартная фу�
 
   scd4x.begin(Wire);                             // инициализация датчика СО2 по шине i2c //
 
-  motor_calibration::state = motor_calibration::quick;
-  object_motor_main.calibrate_test();
-
-  send_reset_info();
+  send_reset_info();                             // причина перезагрузки //
   //send_alert("Я проснулся.");
+
+  recuperator_button_check(true);                // текущий режим вентиляции рекуператор или заслонки //
+  motor_calibration::state = motor_calibration::quick;     // выставление стейта быстрой калибровки //
+  object_motor_main.calibrate_test(true);        // быстрая калибровка //
 }
 
 void loop()                                      // основной луп //
@@ -1342,7 +1359,9 @@ void loop()                                      // основной луп //
 
   object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
-  recuperator_button_check();                                                       // проверяем положение выключателя //
+  recuperator_button_check(false);                                                  // проверяем положение выключателя //
+
+  close_air_dumpers_fast();                                                         // меняем быстро положение заслонок, если включили режим рекуперации //
 
   if (bot1.getUpdates(bot1.last_message_received + 1) != 0)                         // если есть новые сообщения обрабатываем одно //
   {
@@ -1370,7 +1389,7 @@ void loop()                                      // основной луп //
     #endif
 
     restart_check();
-    object_motor_main.calibrate_test();                                                  // проверяет нужна ли калибровка //
+    object_motor_main.calibrate_test(false);                                                  // проверяет нужна ли калибровка //
 
     flag_every_minute_timer = true;
   }
@@ -1708,7 +1727,7 @@ void Message_command_executer(String text)       // обработчик ком�
       {
         motor_calibration::state = motor_calibration::quick;
         object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
-        object_motor_main.calibrate_test();
+        object_motor_main.calibrate_test(false);
         break;
       }
 
@@ -1724,7 +1743,7 @@ void Message_command_executer(String text)       // обработчик ком�
         {
           motor_calibration::state = motor_calibration::full;
           object_array_users[users_array_index].send_message("Принял запрос на полноценную калибровку.");
-          object_motor_main.calibrate_test();
+          object_motor_main.calibrate_test(false);
         }
         else
         {
@@ -1946,7 +1965,9 @@ void update_sensors_data_and_calculations()      // Опрос датчиков 
 
   calculations_b23(buf_c1);            // Эффективность рекуперации на приток //
   calculations_b45(buf_c1);            // Эффективность рекуперации на вытяжку //
-  calculations_b61_b71(buf_c1);        // Процент воздуха с улицы   и   Процент воздуха с батареи //
+  calculations_real_efficiency(buf_c1);// Эффективность рекуперации на приток с учетом теплопотерь //
+
+  calculations_b61_b71();        // Процент воздуха с улицы   и   Процент воздуха с батареи //
 }
 
 void calculations_b23(float buf_c1)              // расчет b23 (Эффективность рекуперации на приток) //
@@ -1989,7 +2010,27 @@ void calculations_b45(float buf_c1)              // расчет b45 (Эффек
   }
 }
 
-void calculations_b61_b71(float buf_c1)          // расчет b61 (Процент воздуха с улицы) и b71 (Процент воздуха с батареи) //
+void calculations_real_efficiency(float buf_c1)
+{
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif 
+  real_efficiency = 0;
+
+  if (buf_c1 < -1 || buf_c1 > 1)                                          // чтобы не считать КПД при разницах Притока и вытяжки меньше 1°C //
+  {
+    float buf_added_heat_loss = b62 / 2;                                                                  // примерные теплопотери от шкафа до вытяжки //
+    float buf_delta = object_ds18b20_2.get_temp() - object_ds18b20_4.get_temp() + buf_added_heat_loss;    // Вытяжка (in) - воздуховод с улицы + примерные теплопотери вытяжного канала //
+    float buf_heat_recovery = object_ds18b20_1.get_temp() - object_ds18b20_0.get_temp();                  // Приток (out) - Приток (in) //
+
+    if(buf_delta != 0)
+    {
+      real_efficiency = 100 / buf_delta * buf_heat_recovery;
+    }
+  }
+}
+
+void calculations_b61_b71()          // расчет b61 (Процент воздуха с улицы) и b71 (Процент воздуха с батареи) //
 {
   #ifdef Jesse_yield_enable
     yield();
@@ -2037,27 +2078,36 @@ void humidifier()                                // увлажнитель //
   }
 }
 
-void recuperator_button_check()
+void recuperator_button_check(bool send_message_anyway)
 {
-  if(analogRead(recuperator_button) < 50 && use_recuperator == true)
+  if(analogRead(recuperator_button) > 975)           // Режим - ЗАСЛОНКИ
   {
-    String recuperator_info_message = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха.";
-    recuperator_info_message += " Чтобы было положительное давление в квартире и пыль и запахи не затягивало из щелей в стенах.";
+    if(use_recuperator == true || send_message_anyway == true)
+    {
+      String recuperator_info_message_2 = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
+      recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
+
+      use_recuperator = false;
+      send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);      
+    }
+  }
+
+  if(analogRead(recuperator_button) < 50)    // Режим - РЕКУПЕРАТОР
+  {
+    if(use_recuperator == false || send_message_anyway == true)
+    {
+    String recuperator_info_message = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха,";
+    recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.";
     recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
 
-    use_recuperator = false;
-    send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
-  }
-
-  else if(analogRead(recuperator_button) > 975 && use_recuperator == false)
-  {
-    String recuperator_info_message_2 = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
-    recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
-
     use_recuperator = true;
-    send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);
+    send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
+    }
   }
+}
 
+void close_air_dumpers_fast()
+{
   if(use_recuperator == true)
   {
     if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_cur)
@@ -2066,6 +2116,7 @@ void recuperator_button_check()
     }
   }
 }
+
 void thermostat()                                // термостат //
 {
   #ifdef Jesse_yield_enable
@@ -2082,7 +2133,7 @@ void thermostat()                                // термостат //
       }
     }
 
-    else if (object_ds18b20_0.get_temp() > (TempMain + TempRange))          // Если рекуператор приток (in) больше ...
+    if (object_ds18b20_0.get_temp() > (TempMain + TempRange))          // Если рекуператор приток (in) больше ...
     {             
       object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
     }
@@ -2157,8 +2208,9 @@ String TEMP_text_output()                        // Команда вывода 
                     "°C\nPeкyп. Приток (out): " + String(object_ds18b20_1.get_temp()) +\
                     "°C\nPeкyп. Вытяжка (in): " + String(object_ds18b20_2.get_temp()) +\
                     "°C\nPeкyп. Вытяжка (out): " + String(object_ds18b20_3.get_temp()) +\
-                    "°C\n\nKПД на приток: " + String(b23) +\
-                    "%\nKПД на вытяжку: " + String(b45) +\
+                    "°C\n\nKПД на вытяжку: " + String(b45) +\
+                    "%\nKПД на приток: " + String(b23) +\
+                    "%\nРеальное КПД притока с учётом теплопотерь: " + String(real_efficiency) +\
                     "%\n\nВоздуховод с улицы: " + String(object_ds18b20_4.get_temp()) +\
                     "°C\nБатарея: " + String(object_ds18b20_7.get_temp()) +\
                     "°C\nВоздуховод с батареи: " + String(object_ds18b20_5.get_temp()) +\
@@ -2189,6 +2241,7 @@ String TEMP_excel_output()                       // Команда вывода 
              String(object_ds18b20_2.get_temp()) + "," +\
              String(object_ds18b20_3.get_temp()) + "," +\
              String(b45) + "," + String(b23) + "," +\
+             String(real_efficiency) + "," +\
              String(object_ds18b20_4.get_temp()) + "," +\
              String(object_ds18b20_7.get_temp()) + "," +\
              String(object_ds18b20_5.get_temp()) + "," +\
