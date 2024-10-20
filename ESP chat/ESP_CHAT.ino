@@ -349,7 +349,7 @@ bool flag_every_minute_timer = false;            // флаг для таймер
 /// ↓↓↓ ДЛЯ СИНХРОНИЗАЦИИ ОШИБОК ↓↓↓ ///
 
 
-bool global_ERROR_flag = false;                          // Флаг для ошибок (1 - нет ошибок, 2 - в цикле были ошибки) // ps в какой-то момент появилось подозрение, что где-то в биоблетаках уже есть ErrorSTATE и возникают ошибки //
+bool global_ERROR_flag = false;                  // Флаг для ошибок (1 - нет ошибок, 2 - в цикле были ошибки) // ps в какой-то момент появилось подозрение, что где-то в биоблетаках уже есть ErrorSTATE и возникают ошибки //
 
 
 /// ↓↓↓ ДАТЧИКИ ТЕМПЕРАТУРЫ ↓↓↓ ///
@@ -489,20 +489,21 @@ class_ds18b20 object_ds18b20_7(false, 0x28, 0x8C, 0x6B, 0x39, 0x0, 0x0, 0x0, 0x3
 /// ↓↓↓ УПРАВЛЕНИЕ ЗАСЛОНКАМИ ↓↓↓ ///
 
 
-float TempMain       = 21.00;                          // температура термостата //
-float TempRange      =   0.5;                          // чувствительность термостата //
-int Step_Per_loop    =    80;                          // количество шагов двигателя за цикл запуска термостата //
-uint16_t target_co2  =   700;                          // максимальное значение со2 в квартире //
-bool use_recuperator;
-#define recuperator_button A0
-#define dir_UP   LOW                   // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
-#define dir_DOWN HIGH                  // ↑↑↑ //
+float TempMain       = 22.80;                    // температура термостата //
+float TempRange      =   0.2;                    // чувствительность термостата //
+int Step_Per_loop    =    40;                    // количество шагов двигателя за цикл запуска термостата //
+uint16_t target_co2  =   700;                    // максимальное значение со2 в квартире //
 
-const byte pin_step_SREET = 12;    //D6              // пин для управления шагами двигателя заслонки с улицы //
-const byte pin_step_HOME  = 13;    //D7               // пин для управления шагами двигателя заслонки от батареи //
-const byte pin_DIR        = 15;    //D8                     // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
-const byte pin_knob_LOW   =  0;    //D3                // нижние концевики  //
-const byte pin_knob_HIGH  =  2;    //D4               // верхние концевики //
+bool use_recuperator;                            // флаг режима рекуператор/заслонки //
+#define recuperator_button A0                    // пин выключателя режима //
+#define dir_UP   LOW                             // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
+#define dir_DOWN HIGH                            // ↑↑↑ //
+
+const byte pin_step_SREET = 12;    //D6          // пин для управления шагами двигателя заслонки с улицы //
+const byte pin_step_HOME  = 13;    //D7          // пин для управления шагами двигателя заслонки от батареи //
+const byte pin_DIR        = 15;    //D8          // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
+const byte pin_knob_LOW   =  0;    //D3          // нижние концевики  //
+const byte pin_knob_HIGH  =  2;    //D4          // верхние концевики //
 
 namespace motor_calibration
 {
@@ -514,11 +515,12 @@ namespace motor_calibration
   }state;
 }
 
-const int street_LOWEST_position_const = -2912;                    // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
-const int home_LOWEST_position_const   =  3188;                    // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
+const int street_LOWEST_position_const = -2912;                                     // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
+const int home_LOWEST_position_const   =  3188;                                     // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
-int street_LOWEST_position_cur = street_LOWEST_position_const;     // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
-int home_LOWEST_position_cur = home_LOWEST_position_const;         // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
+const int street_low_space = 100;                                                   // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+int street_LOWEST_position_cur = street_LOWEST_position_const + street_low_space;   // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
+int home_LOWEST_position_cur = home_LOWEST_position_const;                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
 
 class class_motor
 {
@@ -550,18 +552,22 @@ class class_motor
 class class_motor_plus_knobs : public class_motor
 {
   public:
-    class_motor_plus_knobs(byte pin_step) : class_motor(pin_step)
+    class_motor_plus_knobs(byte pin_step, int low_space, int LOWEST_position) : class_motor(pin_step)
     {
+      _low_space = low_space;                     // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+      _LOWEST_position = LOWEST_position;
     }
 
     bool go_to_HIGH_limit()                       // Калибровка заслонки с улицы верхнее положение //
     {
       int steps_counter_limit4000 = 4000;                                      // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
       _position_before_calibration = 0;
+
       digitalWrite(pin_DIR, dir_UP);
       while (digitalRead(pin_knob_HIGH) == 1 && steps_counter_limit4000 > 0)  // Идём вверх пока не сработает кнопка //
       {
         do_8_microsteps();
+        steps_counter_limit4000--;
         _position_before_calibration++;
       }
 
@@ -575,26 +581,62 @@ class class_motor_plus_knobs : public class_motor
       return(_check_limit4000(steps_counter_limit4000));
     }
 
-    bool set_LOW_limit()                        // Калибровка заслонки с улицы нижнее положение //
+    bool go_to_LOW_limit()                       // Калибровка заслонки с улицы нижнее положение (быстрая калбировка) //
     {
-      _LOWEST_position = 0;
       int steps_counter_limit4000 = 4000;                                      // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
-      _position_before_calibration = 0;
+      _position_before_calibration = _LOWEST_position;
 
       digitalWrite(pin_DIR, dir_DOWN);
-      while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)    // Идём вниз пока не сработает кнопка //
+      while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)   // Идём вниз пока не сработает кнопка //
       {
         do_8_microsteps();
-        _LOWEST_position++;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
         steps_counter_limit4000--;
-        _position_before_calibration++;
+        _position_before_calibration--;
       }
 
       digitalWrite(pin_DIR, dir_UP);
       for (int i = 0; i < _knob_space; i++)                                    // Отступаем обратно //
       {
         do_8_microsteps();
-        _LOWEST_position--;                                              // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+        _position_before_calibration++;
+      }
+
+      for (int i = 0; i < _low_space; i++)                                     // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+      {
+        do_8_microsteps();
+        _position_before_calibration++;
+      }
+
+      return(_check_limit4000(steps_counter_limit4000));
+    }    
+
+    bool set_LOW_limit()                         // Калибровка заслонки с улицы нижнее положение (полноценная калибровка) //
+    {
+      _LOWEST_position = 0;
+      int steps_counter_limit4000 = 4000;                                      // считаем количество шагов, чтобы не уйти в бесконечный цикл, если заклинит двигатель //
+      _position_before_calibration = 0;
+  
+      digitalWrite(pin_DIR, dir_DOWN);
+      while (digitalRead(pin_knob_LOW) == 1 && steps_counter_limit4000 > 0)    // Идём вниз пока не сработает кнопка //
+      {
+        do_8_microsteps();
+        _LOWEST_position++;                                                    // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+        steps_counter_limit4000--;
+        _position_before_calibration++;
+      }
+
+      digitalWrite(pin_DIR, dir_UP);
+      for (int i = 0; i < _knob_space; i++)                                    // Отступаем обратно от концевика //
+      {
+        do_8_microsteps();
+        _LOWEST_position--;                                                    // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+        _position_before_calibration--;
+      }
+
+      for (int i = 0; i < _low_space; i++)                                     // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+      {
+        do_8_microsteps();
+        _LOWEST_position--;                                                    // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
         _position_before_calibration--;
       }
 
@@ -611,7 +653,8 @@ class class_motor_plus_knobs : public class_motor
       return(_position_before_calibration);
     }
   private:
-    const byte _knob_space = 110;
+    const byte _knob_space = 110;                // отступ от концевиков //
+    int _low_space;                              // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
 
     int _position_before_calibration;
 
@@ -629,8 +672,8 @@ class class_motor_plus_knobs : public class_motor
     }
 };
 
-class_motor_plus_knobs object_STREET_motor_plus_knobs(pin_step_SREET);
-class_motor_plus_knobs object_HOME_motor_plus_knobs  (pin_step_HOME);
+class_motor_plus_knobs object_STREET_motor_plus_knobs(pin_step_SREET, street_low_space, 0 - street_LOWEST_position_cur);
+class_motor_plus_knobs object_HOME_motor_plus_knobs  (pin_step_HOME, 0, home_LOWEST_position_cur);
 
 
 
@@ -701,19 +744,19 @@ class class_motor_main
       }
     }
 
-    void calibrate_test(bool is_it_reboot)                            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
+    void calibrate_test(bool is_it_reboot)            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
     {
       #ifdef Jesse_yield_enable
         yield();
       #endif
 
       int buf_steps_GLOBAL = _steps_GLOBAL;                          // сохраняем положение заслонок до калибровки
-
+      int buf_doXsteps_counter = _doXsteps_counter;                  // сохраняем значение счётчика до калибровки
       int street_motor_position_before_calibration;                  // необходимо на случай, если ESP перезагрузилась и после калибровки нужно вернуть заслонки
       int home_motor_position_before_calibration;                    // ↑↑↑
       
 
-      if(motor_calibration::state == 2 && _calibrate_ERROR == false)                    // быстрая калибровка //
+      if(motor_calibration::state == 2 && _calibrate_ERROR == false)                                                        // быстрая калибровка //
       {
         object_array_users[0].send_message_second_chat("Начинаю процесс быстрой калибровки.");
 
@@ -721,20 +764,20 @@ class class_motor_main
         {
           if(use_recuperator == true)
           {
-            _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+            _calibrate_ERROR                         = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
             street_motor_position_before_calibration = object_STREET_motor_plus_knobs.get_position_before_calibration();
-            _calibrate_ERROR = object_HOME_motor_plus_knobs.set_LOW_limit();
-            home_motor_position_before_calibration = object_HOME_motor_plus_knobs.get_position_before_calibration();
+            _calibrate_ERROR                         = object_HOME_motor_plus_knobs.go_to_LOW_limit();
+            home_motor_position_before_calibration   = object_HOME_motor_plus_knobs.get_position_before_calibration();
             _steps_GLOBAL = home_LOWEST_position_cur;
           }
 
           else
           {
-            _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();
+            _calibrate_ERROR                         = object_STREET_motor_plus_knobs.go_to_LOW_limit();
             street_motor_position_before_calibration = object_STREET_motor_plus_knobs.get_position_before_calibration();
-            _calibrate_ERROR = object_HOME_motor_plus_knobs.go_to_HIGH_limit();
-            home_motor_position_before_calibration = object_HOME_motor_plus_knobs.get_position_before_calibration();          
-            _steps_GLOBAL = 0;
+            _calibrate_ERROR                         = object_HOME_motor_plus_knobs.go_to_HIGH_limit();
+            home_motor_position_before_calibration   = object_HOME_motor_plus_knobs.get_position_before_calibration();          
+            _steps_GLOBAL = street_LOWEST_position_cur;
           }
 
           object_array_users[0].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(_steps_GLOBAL));
@@ -747,7 +790,7 @@ class class_motor_main
         }
       }
 
-      if(motor_calibration::state == motor_calibration::full && _calibrate_ERROR == false)                    // полноценная калибровка //
+      if(motor_calibration::state == motor_calibration::full && _calibrate_ERROR == false)                                  // полноценная калибровка //
       {
         object_array_users[0].send_message_second_chat("Начинаю процесс полноценной калибровки.");
 
@@ -811,7 +854,7 @@ class class_motor_main
         yield();
       #endif
 
-      if (motor_calibration::state == motor_calibration::full || motor_calibration::state == motor_calibration::quick)                        // завершающий процесс любой калибровки //
+      if (motor_calibration::state == motor_calibration::full || motor_calibration::state == motor_calibration::quick)      // завершающий процесс любой калибровки //
       {
         if (_calibrate_ERROR == false)                                         // если нет ошибок - возвращаем положение заслонок в положение до калибровки //
         {
@@ -824,30 +867,23 @@ class class_motor_main
 
           else
           {
-            if(street_motor_position_before_calibration > 50)
-            {
-              buf_steps_amount = 0 - street_motor_position_before_calibration - object_HOME_motor_plus_knobs.get_LOWEST_position();
-            }
-
-            else if(home_motor_position_before_calibration > 50)
-            {
-              buf_steps_amount = 0 - home_motor_position_before_calibration;
-            }
+            buf_steps_amount = 0 - _steps_GLOBAL + home_motor_position_before_calibration - street_motor_position_before_calibration;
           }
           
-          _doXsteps_counter = _doXsteps_counter + buf_steps_amount;              // вычитаем количество шагов, чтобы не учитывать их в количестве шагов за день //
           doXsteps_func(buf_steps_amount);
+          _doXsteps_counter = buf_doXsteps_counter;
           motor_calibration::state = motor_calibration::idle;
           object_array_users[0].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
         }
-        if (_calibrate_ERROR == true)                                              // если есть ошибки - отправляем уведомление о невозможности калибровки //
+
+        if (_calibrate_ERROR == true)                                          // если есть ошибки - отправляем уведомление о невозможности калибровки //
         {
           global_ERROR_flag = true;
           send_alert("ERROR: Калибровка невозможна - заклинил двигатель или не работают концевики.");
         }
       }
 
-      if (_daily_calibrate_flag == true && object_TimeDate.get_TimeB() > 150101 && object_TimeDate.get_TimeB() < 152929)      // автоматическая калибровка раз в сутки в 14:01 //
+      if (_daily_calibrate_flag == true && object_TimeDate.get_TimeB() > 150101 && object_TimeDate.get_TimeB() < 152929)    // автоматическая калибровка раз в сутки в 14:01 //
       {
         if(_doXsteps_counter != 0)                                             // если заслонки двигались хоть раз за пол дня - делаем калибровку //
         {
@@ -862,7 +898,7 @@ class class_motor_main
         yield();
       #endif
 
-      if (_daily_calibrate_flag == false)                                                                // поднимаем флаг калибровки //
+      if (_daily_calibrate_flag == false)                                      // поднимаем флаг калибровки //
       {
         if (object_TimeDate.get_TimeB() < 145959 || object_TimeDate.get_TimeB() > 153131)
         {
@@ -870,7 +906,7 @@ class class_motor_main
         }
       }
 
-      if (_step_counter_Flag == 1 && object_TimeDate.get_TimeB() > 234500)   // отправка отчета по количеству пройденых шагов за день //
+      if (_step_counter_Flag == 1 && object_TimeDate.get_TimeB() > 234500)     // отправка отчета по количеству пройденых шагов за день //
       {
         _step_counter_Flag = 0;
         object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter));
@@ -881,30 +917,33 @@ class class_motor_main
         yield();
       #endif
 
-      if (_step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)   // возвращает влаг обратно, чтобы отчет отправился на следующий день //
+      if (_step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)     // возвращает влаг обратно, чтобы отчет отправился на следующий день //
       {
         _step_counter_Flag = 1;
       }
     }
 
-    String getMotorPositions()                         // создает стринг с текстовым описанием положения заслонок как в абсолютном значении, так и в процентах //
+    String getMotorPositions()                        // создает стринг с текстовым описанием положения заслонок как в абсолютном значении, так и в процентах //
     {
       int position_street = 0;
       int position_home = 0;
 
-      if (_steps_GLOBAL < 0) {
-        position_street = map(_steps_GLOBAL, 0, street_LOWEST_position_cur, 0, 100);
+      if (_steps_GLOBAL < 0)
+      {
+        position_street = map(_steps_GLOBAL, 0, street_LOWEST_position_cur - street_low_space, 0, 100);
       }
-      if (_steps_GLOBAL > 0) {
+
+      if (_steps_GLOBAL > 0)
+      {
         position_home = map(_steps_GLOBAL, 0, home_LOWEST_position_cur, 0, 100);
       }
 
-      String Message_Motor_Positions = "\n\nКрайнее нижнее положение заслонки от батареи: " + String(home_LOWEST_position_const) +\
-                                      "\nТекущее положение заслонок(_steps_GLOBAL*): " + String(_steps_GLOBAL) +\
-                                      "\nКрайнее нижнее положение заслонки с улицы: " + String(street_LOWEST_position_cur) +\
-                                      "\n\n*Заслонка с улицы закрыта на " + String(position_street) +\
-                                      "%.\n*Заслонка от батареи закрыта на " + String(position_home) +\
-                                      "%.\n\n**Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter);
+      String Message_Motor_Positions =  "\n\nКрайнее нижнее положение заслонки от батареи: "        + String(home_LOWEST_position_const) +\
+                                        "\nТекущее положение заслонок(_steps_GLOBAL*): "            + String(_steps_GLOBAL) +\
+                                        "\nКрайнее нижнее положение заслонки с улицы: "             + String(street_LOWEST_position_cur) +\
+                                        "\n\n*Заслонка с улицы закрыта на "                         + String(position_street) +\
+                                        "%.\n*Заслонка от батареи закрыта на "                      + String(position_home) +\
+                                        "%.\n\n**Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter);
 
       return (Message_Motor_Positions);
     }
@@ -922,8 +961,8 @@ class class_motor_main
     bool _calibrate_ERROR;
     bool _daily_calibrate_flag = false;               // флаг для таймера автоматической калибровки раз в сутки // стоит false, чтобы если включить ESP с 14 до 19 - не сработало две калибровки подряд (1 раз при включени и еще одна по таймеру) //
     bool _step_counter_Flag = 1;                      // флаг таймера для отправки отчета по количеству пройденных шагов за сутки // Нужно, чтобы быстро понять, не делают ли заслонки лишних движений летом //
-    long _doXsteps_counter = 0;                       // счетчик количества шагов сделанных за день //
-    int _steps_GLOBAL = home_LOWEST_position_const;                         // одна переменная для определения положения ОБЕИХ заслонок // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
+    int _doXsteps_counter = 0;                       // счетчик количества шагов сделанных за день //
+    int _steps_GLOBAL = home_LOWEST_position_const;   // одна переменная для определения положения ОБЕИХ заслонок // _steps_GLOBAL - от 0 вверх - "батарея", от 0 вниз = "улица" //
 };
 
 class_motor_main object_motor_main;
@@ -1439,7 +1478,7 @@ void Message_command_executer(String text)       // обработчик ком�
     yield();
   #endif
 
-  if (text == "/back")                      // отмена ввода //
+  if (text == "/back")                           // отмена ввода //
   {
     if (object_array_users[users_array_index].get_message_state() == 1)
     {
@@ -1486,7 +1525,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 104:                                // установка температуры термостата //
+      case 104:                                  // установка температуры термостата //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         TempMain = constrain(buf_text_float, -55, 55);
@@ -1494,7 +1533,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;      
       }
 
-      case 105:                                // установка чувствительности термостата //
+      case 105:                                  // установка чувствительности термостата //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         TempRange = constrain(buf_text_float, 0.2, 6);
@@ -1502,15 +1541,15 @@ void Message_command_executer(String text)       // обработчик ком�
         break;   
       }
 
-      case 107:                                // установка максимального уровня СО2 для заслонок //
+      case 107:                                  // установка максимального уровня СО2 для заслонок //
       {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        int buf_text_int = text.toInt();         // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         target_co2 = constrain(buf_text_int, 500, 1000);
-        object_array_users[users_array_index].send_message("Максимальный уровень СО2 в квартире для заслонок (+-25): " + String(target_co2) + "ppm");
+        object_array_users[users_array_index].send_message("Максимальный уровень СО2 в квартире для заслонок (+-20): " + String(target_co2) + "ppm");
         break;  
       }
 
-      case 108:                                // установка шага заслонок //
+      case 108:                                  // установка шага заслонок //
       {
         int calculation_buf2 = 999999;
         int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
@@ -1527,7 +1566,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 109:                                // ручное управление заслонками //
+      case 109:                                  // ручное управление заслонками //
       {
         int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         int buf_steps_amount = constrain(buf_text_int, -10000, 10000);
@@ -1538,7 +1577,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 111:                               // ручная установка крайнего нижнего положения заслонки с улицы //
+      case 111:                                  // ручная установка крайнего нижнего положения заслонки с улицы //
       {
         int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         street_LOWEST_position_cur = constrain(buf_text_int, street_LOWEST_position_const, 0);
@@ -1550,7 +1589,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 112:                               // ручная установка крайнего нижнего положения заслонки от батареи //
+      case 112:                                  // ручная установка крайнего нижнего положения заслонки от батареи //
       {
         int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         home_LOWEST_position_cur = constrain(buf_text_int, 0, home_LOWEST_position_const);
@@ -1562,7 +1601,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 113:                               // Установка желаемой влажности //
+      case 113:                                  // Установка желаемой влажности //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         room_humidity_target = constrain(buf_text_float, 5, 65);
@@ -1576,7 +1615,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 114:                               // Установка чувствительности увлажнителя //
+      case 114:                                  // Установка чувствительности увлажнителя //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         room_humidity_range = constrain(buf_text_float, 3, 20);
@@ -1590,7 +1629,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;  
       }
 
-      case 390:                               // выбор гостевого чата вручную //
+      case 390:                                  // выбор гостевого чата вручную //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1609,7 +1648,7 @@ void Message_command_executer(String text)       // обработчик ком�
     object_array_users[users_array_index].set_message_state(1);
   }
 
-  else                                       // если MessageState == 1, то значит ожидаем команду //
+  else                                           // если MessageState == 1, то значит ожидаем команду //
   {
     #ifdef Jesse_yield_enable
       yield();
@@ -1620,23 +1659,23 @@ void Message_command_executer(String text)       // обработчик ком�
 
     int text_int = buf_text.toInt();
 
-    switch (text_int)                        // 1** команды доступные всем, 3** команды требующие доступ администратора //
+    switch (text_int)                            // 1** команды доступные всем, 3** команды требующие доступ администратора //
     {
-      case 101:                              // текущие температуры в текстовом виде //
+      case 101:                                  // текущие температуры в текстовом виде //
       {
         update_sensors_data_and_calculations();
         object_array_users[users_array_index].send_message(TEMP_text_output() + "\n\n\n\n↓↓↓ЗАСЛОНКИ↓↓↓" + object_motor_main.getMotorPositions());
         break;
       }
       
-      case 102:                              // текущие температуры в формате excel //
+      case 102:                                  // текущие температуры в формате excel //
       {
         update_sensors_data_and_calculations(); 
         object_array_users[users_array_index].send_message(TEMP_excel_output() + "\n\n*Дата и время добавляется LOG ботом, по этому её здесь нет.");
         break;
       }
 
-      case 103:                              // установка оповещений (ALERT) //
+      case 103:                                  // установка оповещений (ALERT) //
       { 
         String buf = "Установка оповещений: \n\n Температура нижняя граница (/10301@JOArduinoChatBOT). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
                      "\n Влажность нижняя граница (/10302@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()) +\
@@ -1646,7 +1685,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 10301:                            // ↑↑↑ // температура // 
+      case 10301:                                // ↑↑↑ // температура // 
       {
         String buf = "Отправьте сообщение для установки температуры, НИЖЕ которой будут приходить уведомления (ALERT) (от -55 до 55):\n\n   Текущее значение Рекуператор Приток (in): " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
                      "\n   Текущее значение Рекуператор Вытяжка (out): " + String(object_ds18b20_3.get_crit_temp_low_alert());
@@ -1655,28 +1694,28 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 10302:                            // ↑↑↑ // влажность нижняя граница //      
+      case 10302:                                // ↑↑↑ // влажность нижняя граница //      
       {
         object_array_users[users_array_index].send_message("Отправьте сообщение для установки влажности, НИЖЕ которой будут приходить уведомления (ALERT) (от 0 до 100):\n\nТекущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()));
         object_array_users[users_array_index].set_message_state(10302);
         break;            
       }
 
-      case 10303:                            // ↑↑↑ // влажность верхняя граница //      
+      case 10303:                                // ↑↑↑ // влажность верхняя граница //      
       {
         object_array_users[users_array_index].send_message("Отправьте сообщение для установки влажности, ВЫШЕ которой будут приходить уведомления (ALERT) (от 0 до 100):\n\nТекущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()));
         object_array_users[users_array_index].set_message_state(10303);
         break;            
       }
 
-      case 10304:                            // ↑↑↑ // со2 // 
+      case 10304:                                // ↑↑↑ // со2 // 
       {
         object_array_users[users_array_index].send_message("Отправьте сообщение для установки СО2, ВЫШЕ котрого будут приходить уведомления (ALERT) (от 0 до 2500):\n\nТекущее значение: " + String(object_CO2_sensor.get_co2_high_alert()));
         object_array_users[users_array_index].set_message_state(10304);
         break;            
       }
 
-      case 104:                              // установка температуры термостата //
+      case 104:                                  // установка температуры термостата //
       {
         String buf = "Отправьте сообщение для установки температуры термостата в °C (от -55 до 55):\n\nТекущее значение: " + String(TempMain) +\
                      "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in).\n\n**Термостат не будет работать пока разница температур на улице и дома не достигнет 8 градусов (Пока этого не произойдет - процент водуха с улицы и от батареи будет равен нулю).";
@@ -1685,21 +1724,21 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 105:                              // установка чувствительности термостата //
+      case 105:                                  // установка чувствительности термостата //
       {
         object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности термостата в °C (от 0.2 до 6):\n\nТекущее значение: " + String(TempRange));
         object_array_users[users_array_index].set_message_state(105);
         break;
       }
 
-      case 107:                              // установка максимального уровня СО2 для заслонок //
+      case 107:                                  // установка максимального уровня СО2 для заслонок //
       {
-        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки максимального уровня СО2 в квартире для заслонок +-25 (от 500 до 1000):\n\nТекущее значение: " + String(target_co2) + "ppm");
+        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки максимального уровня СО2 в квартире для заслонок +-20 (от 500 до 1000):\n\nТекущее значение: " + String(target_co2) + "ppm");
         object_array_users[users_array_index].set_message_state(107);
         break;
       }
 
-      case 108:                              // установка шага заслонок //
+      case 108:                                  // установка шага заслонок //
       {
         int calculation_buf2 = 999999;
 
@@ -1716,14 +1755,14 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 109:                              // ручное управление заслонками //
+      case 109:                                  // ручное управление заслонками //
       {
         object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + object_motor_main.getMotorPositions());
         object_array_users[users_array_index].set_message_state(109);
         break;
       }
 
-      case 110:                              // ручная инициализация быстрой калибровки заслонок //
+      case 110:                                  // ручная инициализация быстрой калибровки заслонок //
       {
         motor_calibration::state = motor_calibration::quick;
         object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
@@ -1731,13 +1770,13 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 310:                              // ручная инициализация полноценной калибровки заслонок //
+      case 310:                                  // ручная инициализация полноценной калибровки заслонок //
       {
         object_array_users[users_array_index].send_message("Полноценная калибровка займет несколько минут. \n\n*Полноценная калибровка сбрасывает крайние положения заслонок выставленные вручную.\n\n\nПродолжить? - /31001@JOArduinoChatBOT");
         break;
       }
 
-      case 31001:                            // ручная инициализация полноценной калибровки заслонок // подтверждение //
+      case 31001:                                // ручная инициализация полноценной калибровки заслонок // подтверждение //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1752,7 +1791,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 111:                              // ручная установка крайнего нижнего положения заслонки с улицы //
+      case 111:                                  // ручная установка крайнего нижнего положения заслонки с улицы //
       {
         String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки с улицы (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки с улицы после калибровки: " + String(street_LOWEST_position_const) +\
                      "\nЗначение выставленное вручную: " + String(street_LOWEST_position_cur);
@@ -1761,7 +1800,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 112:                              // ручная установка крайнего нижнего положения заслонки от батареи //
+      case 112:                                  // ручная установка крайнего нижнего положения заслонки от батареи //
       {
         String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки от батареи (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки от батареи после калибровки: " + String(home_LOWEST_position_const) +\
                      "\nЗначение выставленное вручную: " + String(home_LOWEST_position_cur);
@@ -1770,7 +1809,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 113:                              // Установка желаемой влажности //
+      case 113:                                  // Установка желаемой влажности //
       {
         String buf = "Отправьте сообщение для установки желаемой влажности(от 5 до 65).\n\nТекущее значение: " + String(room_humidity_target) +\
                      "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
@@ -1780,7 +1819,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 114:                              // Установка чувствительности увлажнителя //
+      case 114:                                  // Установка чувствительности увлажнителя //
       {
         String buf = "Отправьте сообщение для установки чувствительности увлажнителя (от 3 до 20).\n\nТекущее значение: " + String(room_humidity_range) +\
                      "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
@@ -1790,19 +1829,19 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 190:                              // ВКЛ/ВЫКЛ Текстовых уведомлений //
+      case 190:                                  // ВКЛ/ВЫКЛ Текстовых уведомлений //
       {
         object_array_users[users_array_index].set_alert_flag();
         break;
       }
 
-      case 350:                              // установка разрешения ds12b20 на 12bit //
+      case 350:                                  // установка разрешения ds12b20 на 12bit //
       {
         object_array_users[users_array_index].send_message("Эта комана необходима в случае, если настройки датчиков температуры сбились и показывают значения с разрешением 9бит вместо 12бит (разрешение 9бит - 0,5, разрешение 12бит - 0.0625)\n\n\nПродолжить? - /35001@JOArduinoChatBOT");
         break;
       }
 
-      case 35001:                            // ↑↑↑ // Подтверждение //
+      case 35001:                                // ↑↑↑ // Подтверждение //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1822,13 +1861,13 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 351:                             // перезапуск датчика со2 //
+      case 351:                                  // перезапуск датчика со2 //
       {
         object_array_users[users_array_index].send_message("Если датчик СО2 перестал отдавать показания или глючит - можно попробовать его перезапустить.\n\n\nПродолжить? - /35101@JOArduinoChatBOT");
         break;
       }
 
-      case 35101:                           // ↑↑↑ // Подтверждение //
+      case 35101:                                // ↑↑↑ // Подтверждение //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1842,13 +1881,13 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 352:
+      case 352:                                  // рекалибровка со2 //
       {
         object_array_users[users_array_index].send_message("Рекалибровка датчика СО2 нужна в случае, если даже при открытых окнах он не показывает значение около 400 и нужно его рекалибровать.\n\nПри рекалибровке необходимо максимально проветрить помещение, чтобы воздух был близок к уличному.\n\n\nПродолжить? - /35201@JOArduinoChatBOT");
         break;      
       }
 
-      case 35201:
+      case 35201:                                // ↑↑↑ // Подтверждение //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1862,13 +1901,13 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 353:
+      case 353:                                  // сброс на заводские настройки со2 //
       {
         object_array_users[users_array_index].send_message("Сброс на заводские настройки сбрасывает все настройки, в том числе параметры калбировки датчика.\n\n\nПродолжить? - /35301@JOArduinoChatBOT");
         break;      
       }
 
-      case 35301:
+      case 35301:                                // ↑↑↑ // Подтверждение //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1882,7 +1921,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 370:
+      case 370:                                  // Перезагрузка ESP //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -1897,7 +1936,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 380:
+      case 380:                                  // отключить всех остальных пользователей от управления //
       {
         if (users_array_index == 0)
         {
@@ -1919,7 +1958,7 @@ void Message_command_executer(String text)       // обработчик ком�
         break;
       }
 
-      case 390:                             // выбор гостевого чата //
+      case 390:                                  // выбор гостевого чата //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
@@ -2010,7 +2049,7 @@ void calculations_b45(float buf_c1)              // расчет b45 (Эффек
   }
 }
 
-void calculations_real_efficiency(float buf_c1)
+void calculations_real_efficiency(float buf_c1)  // КПД притока с учетом теплопотерь //
 {
   #ifdef Jesse_yield_enable
     yield();
@@ -2030,7 +2069,7 @@ void calculations_real_efficiency(float buf_c1)
   }
 }
 
-void calculations_b61_b71()          // расчет b61 (Процент воздуха с улицы) и b71 (Процент воздуха с батареи) //
+void calculations_b61_b71()                      // расчет b61 (Процент воздуха с улицы) и b71 (Процент воздуха с батареи) //
 {
   #ifdef Jesse_yield_enable
     yield();
@@ -2080,7 +2119,7 @@ void humidifier()                                // увлажнитель //
 
 void recuperator_button_check(bool send_message_anyway)
 {
-  if(analogRead(recuperator_button) > 975)           // Режим - ЗАСЛОНКИ
+  if(analogRead(recuperator_button) > 975)       // Режим - ЗАСЛОНКИ
   {
     if(use_recuperator == true || send_message_anyway == true)
     {
@@ -2092,7 +2131,7 @@ void recuperator_button_check(bool send_message_anyway)
     }
   }
 
-  if(analogRead(recuperator_button) < 50)    // Режим - РЕКУПЕРАТОР
+  if(analogRead(recuperator_button) < 50)        // Режим - РЕКУПЕРАТОР
   {
     if(use_recuperator == false || send_message_anyway == true)
     {
@@ -2106,7 +2145,7 @@ void recuperator_button_check(bool send_message_anyway)
   }
 }
 
-void close_air_dumpers_fast()
+void close_air_dumpers_fast()                    // Быстрое закрытие заслонок при изменение режима вентиляции на "рекуператор" //
 {
   if(use_recuperator == true)
   {
@@ -2127,7 +2166,7 @@ void thermostat()                                // термостат //
   {
     if (object_ds18b20_0.get_temp() < (TempMain - TempRange))          // Если рекуператор приток (in) меньше ...
     {
-      if(object_CO2_sensor.get_CO2() < (target_co2 - 25))              // Если СО2 меньше, чем...
+      if(object_CO2_sensor.get_CO2() < (target_co2 - 20))              // Если СО2 меньше, чем...
       {
         object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
       }
@@ -2138,7 +2177,7 @@ void thermostat()                                // термостат //
       object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
     }
 
-    else if (object_CO2_sensor.get_CO2() > (target_co2 + 25))          // Если СO2 больше, чем...
+    else if (object_CO2_sensor.get_CO2() > (target_co2 + 20))          // Если СO2 больше, чем...
     {             
       object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
     }
