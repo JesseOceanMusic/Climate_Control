@@ -81,6 +81,6 @@
 
 ![Фотография заслонок](images/Air_Dumpers.jpg)
 ![Фотография часов](images/Clock.jpg)
-![Фотография ESP1](images/Wiring1.jpg)
+![Фотография ESP2](images/Wiring1.jpg)
 ![Фотография ESP2](images/Wiring2.jpg)
 ![Фотография ESP2](images/Wiring3.jpg)
