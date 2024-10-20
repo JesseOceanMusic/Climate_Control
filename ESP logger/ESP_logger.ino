@@ -397,6 +397,10 @@ class class_NightTime                            // класс ночного р
         }
       }
 
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       if(_NightTimeState >= NightTime::State::NEUTRAL)                       // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
       {
         if (object_TimeDate.get_TimeB() > 65000 && object_TimeDate.get_TimeB() < 205800)
@@ -526,6 +530,11 @@ class class_Clock                                // класс часов //
       for (int i = 0; i < 7; i++)                          // по сути, этот цикл является очень примитивным дешифратором, где _key_ID это индекс строки в массиве _key_ARRAY, на которой лежит ключ//
       {    
         buf_array [i*2] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
+
+        #ifdef Jesse_yield_enable
+          yield();
+        #endif
+
         buf_array [(i*2)+1] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
 
         #ifdef Jesse_yield_enable
@@ -724,13 +733,13 @@ void loop()                                      // основной луп //
   }
 
 
-  if (global_ERROR_flag == true)                                                       // проверят были ли ошибки и если были - делает анимацию //
+  if (global_ERROR_flag == true)                                               // проверят были ли ошибки и если были - делает анимацию //
   {
     if (object_NightTime.get_NightTimeState() == 1)                            // 1 значит - днём можно включить ночной режим, чтобы отключить анимацию ошибки во время отладки // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл до след вечера //
     {    
       Led_animation_error();                                                   // если были ошибки и сейчас день, без включенного ночного режима - запускаем анимацию ошибки //
     }
-    global_ERROR_flag = false;                                                          // в любом случае сбрасываем флаг ошибки, чтобы если ночью была ошибка, то утром первым делом она не захерачила анимацию //     
+    global_ERROR_flag = false;                                                 // в любом случае сбрасываем флаг ошибки, чтобы если ночью была ошибка, то утром первым делом она не захерачила анимацию //     
   }
   
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)    // таймер каждую нечетную минуту //
@@ -1233,12 +1242,22 @@ void LOGtimer()                                  // отправка лога в
       send_alert("ERROR: SD card initialization FAILED");
     }
 
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt");
+
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     if (myFile)
     {
       int size = myFile.size();
       String response = bot4.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[0].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
     }
+
     else
     {
       send_alert("ERROR: Create or open .txt FAILED");
@@ -1246,10 +1265,18 @@ void LOGtimer()                                  // отправка лога в
     flag_every_day_timer = true;
   }
 
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (flag_every_day_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы лог отправился на следующий день // 
   {    
     flag_every_day_timer = false;
   }
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif  
 }
 
 void LOGwrite()                                  // запись в лог //
@@ -1263,17 +1290,30 @@ void LOGwrite()                                  // запись в лог //
     send_alert("ERROR: SD card initialization FAILED");
   }
 
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt", FILE_WRITE);
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   if (myFile)
   {
   myFile.println(object_TimeDate.get_DateTimeFULL() + "," + SYNCdata);
   myFile.close();
   }
+
   else
   {
     send_alert("ERROR: Create or open .txt FAILED");
   }
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 }
 
 void LOGread()                                   // чтение лога //
@@ -1287,12 +1327,22 @@ void LOGread()                                   // чтение лога //
     send_alert("ERROR: SD card initialization FAILED");
   }
 
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt");
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (myFile)
   {
     int size = myFile.size();
     String response=bot2.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[users_array_index].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
   }
+
   else
   {
     send_alert("ERROR: Create or open .txt FAILED");
@@ -1568,6 +1618,9 @@ void clock_string_to_array_converter()           // конвертация по�
   byte dividerIndex3 = buf2.indexOf(',');
   String buf_co2 = buf2.substring(0, dividerIndex3);
 
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   float buf1_temp = buf_temp.toFloat();
   buf1_temp = buf1_temp*10;
@@ -1690,6 +1743,10 @@ void clock_string_to_array_converter()           // конвертация по�
 
 void clock_animation()                           // анимация часов  //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   int HSVhue_clock_buf = HSVhue_clock;                          // буфер переменной для сравнения ниже //
 
   if (timer_min_hue_clock_target == 60)                         // если интервал 60 минут, то цвет меняется в 00 минут независимо от того, когда включили микроконтроллер //
@@ -1709,6 +1766,10 @@ void clock_animation()                           // анимация часов 
       timer_min_hue_clock_cur = 0;
     }
   }
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   if (HSVval3cur <= HSVval3night)                               // если яркость меньше или равна ночному режиму, значит сейчас ночной режим. анимации отключена, управление по RGB. //
   {
@@ -1768,6 +1829,10 @@ void clock_animation()                           // анимация часов 
 
 String clock_indication()                        // отображение текущего состояния отображения данных на табло в текстовом виде //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   String buf_time_message;
   String buf_co2_message;
   String buf_temp_message;
@@ -1782,6 +1847,10 @@ String clock_indication()                        // отображение те�
     buf_time_message = "\n  Время - отключено ( /11101 ).";
   }
 
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (clock_night_indication_co2 == true)
   {
     buf_co2_message = "\n  СО2 - включено ( /11102 ).";    
@@ -1791,6 +1860,10 @@ String clock_indication()                        // отображение те�
     buf_co2_message = "\n  СО2 - отключено ( /11102 ).";
   }
 
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (clock_night_indication_temperature == true)
   {
     buf_temp_message = "\n  Температура - включена ( /11103 ).";     
@@ -1799,6 +1872,10 @@ String clock_indication()                        // отображение те�
   {
     buf_temp_message = "\n  Температура - отключена ( /11103 ).";
   }
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   if (clock_night_indication_humidity == true)
   {
