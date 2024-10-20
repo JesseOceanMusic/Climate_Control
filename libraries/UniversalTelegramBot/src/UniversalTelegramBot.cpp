@@ -66,18 +66,22 @@ String UniversalTelegramBot::sendGetToTelegram(const String& command) {
   String body, headers;
   
   // Connect with api.telegram.org if not already connected
-  if (!client->connected()) {
+  if (!client->connected())
+  {
+    yield();        // Jesse //
     #ifdef TELEGRAM_DEBUG  
         Serial.println(F("[BOT]Connecting to server"));
     #endif
-    if (!client->connect(TELEGRAM_HOST, TELEGRAM_SSL_PORT)) {
+    if (!client->connect(TELEGRAM_HOST, TELEGRAM_SSL_PORT))
+    {
       #ifdef TELEGRAM_DEBUG  
         Serial.println(F("[BOT]Conection error"));
       #endif
     }
   }
-  if (client->connected()) {
-
+  if (client->connected())
+  {
+    yield();        // Jesse //
     #ifdef TELEGRAM_DEBUG  
         Serial.println("sending: " + command);
     #endif  
@@ -91,8 +95,8 @@ String UniversalTelegramBot::sendGetToTelegram(const String& command) {
     client->println();
 
     readHTTPAnswer(body, headers);
+    yield();        // Jesse //
   }
-
   return body;
 }
 
@@ -354,15 +358,21 @@ bool UniversalTelegramBot::setMyCommands(const String& commandArray) {
  ***************************************************************/
 int UniversalTelegramBot::getUpdates(long offset) {
 
+  yield();        // Jesse //
+  
   #ifdef TELEGRAM_DEBUG  
     Serial.println(F("GET Update Messages"));
   #endif
+
   String command = BOT_CMD("getUpdates?offset=");
   command += offset;
   command += F("&limit=");
   command += HANDLE_MESSAGES;
 
-  if (longPoll > 0) {
+  yield();        // Jesse //
+
+  if (longPoll > 0)
+  {
     command += F("&timeout=");
     command += String(longPoll);
   }
@@ -375,30 +385,47 @@ int UniversalTelegramBot::getUpdates(long offset) {
 // But as last_message_received was not updated we will allways read the same message.
 // Here we try to find the update_id and store it to update last_message_received if necessary.
 
-  char * pt1; char * pt2; long candidate;
-  candidate = -1;
+  char * pt1;
+  char * pt2;
+  long candidate = -1;
+
+  yield();        // Jesse //
+
   pt1 = strstr_P( response.c_str(), (const char *) F("update_id"));
-  if ( pt1 != NULL ) {
+  if ( pt1 != nullptr)
+  {
+    yield();        // Jesse //
     pt1 = strstr_P( pt1, (const char *) F(":"));
-    if ( pt1 != NULL ) {
+    if ( pt1 != nullptr)
+    {
+      yield();        // Jesse //
       pt1++;
       pt2 = strstr_P( pt1, (const char *) F(","));
-      if ( pt2 != NULL ) {
-        if ( pt2 - pt1 < 12 ) { // for safety 
+      if ( pt2 != nullptr )
+      {
+        yield();        // Jesse //
+        if ( pt2 - pt1 < 12 ) // for safety
+        {  
           sscanf( pt1, "%ld", &candidate );
         }
       }
     }
   }
 // End Robert
-  if (response == "") {
+  if (response == "")
+  {
+    yield();        // Jesse //
+
     #ifdef TELEGRAM_DEBUG  
         Serial.println(F("Received empty string in response!"));
     #endif
     // close the client as there's nothing to do with an empty string
     closeClient();
     return 0;
-  } else {
+  } 
+  else
+  {
+    yield();        // Jesse //
     #ifdef TELEGRAM_DEBUG  
       Serial.print(F("incoming message length "));
       Serial.println(response.length());
@@ -409,7 +436,9 @@ int UniversalTelegramBot::getUpdates(long offset) {
     DynamicJsonDocument doc(maxMessageLength);
     DeserializationError error = deserializeJson(doc, ZERO_COPY(response));
       
-    if (!error) {
+    if (!error)
+    {
+      yield();        // Jesse //
       #ifdef TELEGRAM_DEBUG  
         Serial.print(F("GetUpdates parsed jsonObj: "));
         serializeJson(doc, Serial);
@@ -437,16 +466,22 @@ int UniversalTelegramBot::getUpdates(long offset) {
             Serial.println(F("Response contained no 'result'"));
         #endif
       }
-    } else { // Parsing failed
+    }
+    else  // Parsing failed
+    {
+      yield();        // Jesse //
       // Robert: try to update last_message_received 
       if ( candidate != -1 ) last_message_received = candidate;	  	  
       // End Robert
 	  
-      if (response.length() < 2) { // Too short a message. Maybe a connection issue
+      if (response.length() < 2)   // Too short a message. Maybe a connection issue
+      { 
         #ifdef TELEGRAM_DEBUG  
             Serial.println(F("Parsing error: Message too short"));
         #endif
-      } else {
+      }
+      else
+      {
         // Buffer may not be big enough, increase buffer or reduce max number of
         // messages
         #ifdef TELEGRAM_DEBUG 
