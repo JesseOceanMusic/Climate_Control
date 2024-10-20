@@ -73,8 +73,9 @@
 # Принципиальная схема
 
 Сделано с помощью EasyEDA.com
+https://oshwlab.com/narayanabox/climate-cobtrol
 
-![Чертеж принципиальной схемы](images/Schematic_2024_10_01.png)
+![Чертеж принципиальной схемы](images/Schematic.png)
 
 
 # Фотографии
