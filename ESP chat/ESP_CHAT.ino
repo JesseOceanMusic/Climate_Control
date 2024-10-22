@@ -1,3 +1,19 @@
+///↓↓↓ ОТЛАДКА - 1 ↓↓↓///
+
+
+//#define Jesse_DEBUG_free_heap
+#ifdef Jesse_DEBUG_free_heap
+  time_t Jesse_debug_free_heap_timer;
+#endif
+
+//#define Jesse_DEBUG_loop_millis_measure
+#ifdef Jesse_DEBUG_loop_millis_measure
+  long test_timer;
+#endif
+
+#define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
+
+
 /// ↓↓↓ ТЕЛЕГРАМ ↓↓↓ ///
 
 
@@ -220,10 +236,6 @@ class class_TimeDate                             // класс Даты и Вр�
       _TimeMIN = buf_Time_MIN.toInt();
       _TimeSEC = buf_Time_SEC.toInt();
 
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
       if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
       {
         buf_Date_MONTH = String("0" + buf_Date_MONTH);
@@ -248,10 +260,6 @@ class class_TimeDate                             // класс Даты и Вр�
       {
         buf_Time_SEC = String ("0" + buf_Time_SEC);
       }
-
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
 
       _DateMONTH = buf_Date_MONTH.toInt();
       _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
@@ -386,10 +394,6 @@ class class_ds18b20                              // класс датчиков 
       _array_address[2]= ar2;
       _array_address[3]= ar3;
 
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
       _array_address[4]= ar4;
       _array_address[5]= ar5;
       _array_address[6]= ar6;
@@ -404,6 +408,8 @@ class class_ds18b20                              // класс датчиков 
       #endif
 
       _temp = ds.getTempC(_array_address);
+    //  _second_temp_request();
+
       if (_alert_flag == true)
       {
         _check_alerts();
@@ -474,6 +480,14 @@ class class_ds18b20                              // класс датчиков 
       }
     }
 
+    void _second_temp_request()                  // если датчик не прислал показания пробуем запросить еще раз. При Ошибке выдаёт -127.00 //
+    {
+      if(_temp < -120)                           
+      {
+        delay(50);
+        _temp = ds.getTempC(_array_address);
+      }
+    }
 };
 
 class_ds18b20 object_ds18b20_0(true, 0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43,  "Рекуператор Приток (in): ", 45);
@@ -1308,20 +1322,8 @@ void restart_check()
 }
 
 
-///↓↓↓ ОТЛАДКА ↓↓↓///
+///↓↓↓ ОТЛАДКА - 2 ↓↓↓///
 
-
-//#define Jesse_DEBUG_free_heap
-#ifdef Jesse_DEBUG_free_heap
-  time_t Jesse_debug_free_heap_timer;
-#endif
-
-//#define Jesse_DEBUG_loop_millis_measure
-#ifdef Jesse_DEBUG_loop_millis_measure
-  long test_timer;
-#endif
-
-#define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 void send_reset_info()
 {
