@@ -1,4 +1,20 @@
-///↓↓↓ ТЕЛЕГРАМ ↓↓↓///
+///↓↓↓ ОТЛАДКА - 1 ↓↓↓///
+
+
+//#define Jesse_DEBUG_free_heap
+#ifdef Jesse_DEBUG_free_heap
+  time_t Jesse_debug_free_heap_timer;
+#endif
+
+//#define Jesse_DEBUG_loop_millis_measure
+#ifdef Jesse_DEBUG_loop_millis_measure
+  long test_timer;
+#endif
+
+#define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
+
+
+/// ↓↓↓ ТЕЛЕГРАМ ↓↓↓ ///
 
 
 #include <ESP8266WiFi.h>                         // Telegram библиотеки //    
@@ -220,10 +236,6 @@ class class_TimeDate                             // класс Даты и Вр�
       _TimeMIN = buf_Time_MIN.toInt();
       _TimeSEC = buf_Time_SEC.toInt();
 
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
       if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
       {
         buf_Date_MONTH = String("0" + buf_Date_MONTH);
@@ -248,10 +260,6 @@ class class_TimeDate                             // класс Даты и Вр�
       {
         buf_Time_SEC = String ("0" + buf_Time_SEC);
       }
-
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
 
       _DateMONTH = buf_Date_MONTH.toInt();
       _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
@@ -656,20 +664,8 @@ void restart_check()
 }
 
 
-///↓↓↓ ОТЛАДКА ↓↓↓///
+///↓↓↓ ОТЛАДКА - 2 ↓↓↓///
 
-
-//#define Jesse_DEBUG_free_heap
-#ifdef Jesse_DEBUG_free_heap
-  time_t Jesse_debug_free_heap_timer;
-#endif
-
-//#define Jesse_DEBUG_loop_millis_measure
-#ifdef Jesse_DEBUG_loop_millis_measure
-  long test_timer;
-#endif
-
-#define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 void send_reset_info()
 {
@@ -681,6 +677,7 @@ void send_reset_info()
   buf_message += Jesse_reset_info;
   send_alert(buf_message);
 }
+
 
 ///   ///   ///   ///   ///   ///   ///
 
