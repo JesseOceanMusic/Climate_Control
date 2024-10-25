@@ -513,11 +513,11 @@ bool use_recuperator;                            // флаг режима рек
 #define dir_UP   LOW                             // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
 #define dir_DOWN HIGH                            // ↑↑↑ //
 
-const byte pin_step_SREET = 12;    //D6          // пин для управления шагами двигателя заслонки с улицы //
-const byte pin_step_HOME  = 13;    //D7          // пин для управления шагами двигателя заслонки от батареи //
-const byte pin_DIR        = 15;    //D8          // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
+const byte pin_DIR        = 16;    //D0          // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
 const byte pin_knob_LOW   =  0;    //D3          // нижние концевики  //
 const byte pin_knob_HIGH  =  2;    //D4          // верхние концевики //
+const byte pin_step_SREET = 12;    //D6          // пин для управления шагами двигателя заслонки с улицы //
+const byte pin_step_HOME  = 13;    //D7          // пин для управления шагами двигателя заслонки от батареи //
 
 namespace motor_calibration
 {
@@ -969,7 +969,7 @@ class class_motor_main
 
     long get_doXsteps_counter()
     {
-      return(_steps_GLOBAL);
+      return(_doXsteps_counter);
     }
   private:
     bool _calibrate_ERROR;
