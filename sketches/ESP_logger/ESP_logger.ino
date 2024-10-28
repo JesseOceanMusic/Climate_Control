@@ -1,357 +1,17 @@
-///↓↓↓ ОТЛАДКА - 1 ↓↓↓///
+//Tools > MMU 16KB cache + 48KB IRAM and 2nd HEAP (shared)
+//Tools > Stack Protection Enable
+//NodeMCU 1.0 (ESP-12E Module)
+
+#define THIS_IS_LOGGER_CODE
+
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_001\Common_CODE.cpp"
+
+///↓↓↓ ОТЛАДКА ↓↓↓///
 
 
 //#define Jesse_DEBUG_free_heap
-#ifdef Jesse_DEBUG_free_heap
-  time_t Jesse_debug_free_heap_timer;
-#endif
-
 //#define Jesse_DEBUG_loop_millis_measure
-#ifdef Jesse_DEBUG_loop_millis_measure
-  long test_timer;
-#endif
-
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
-
-
-/// ↓↓↓ ТЕЛЕГРАМ ↓↓↓ ///
-
-
-#include <ESP8266WiFi.h>                         // Telegram библиотеки //    
-#include <WiFiClientSecure.h>                    // ↑↑↑ //    
-#include <UniversalTelegramBot.h>                // ↑↑↑ //    
-#include <ArduinoJson.h>                         // ↑↑↑ //  
-
-
-#include "Sensetive_INFO.cpp"                    // логины/пароли/токены/id //
-  /*
-  WIFI_SSID
-  WIFI_PASSWORD
-  BOT_TOKEN1
-  BOT_TOKEN2
-  BOT_TOKEN3
-  BOT_TOKEN4
-  USER_ID0
-  USER_ID1
-  USER_ID2
-  USER_ID3
-  USER_ID4
-  USER_ID5
-*/
-
-X509List cert(TELEGRAM_CERTIFICATE_ROOT);                                      // какой-то сертификат //
-WiFiClientSecure secured_client;                                               // какой-то secured client //
-
-//UniversalTelegramBot bot1(BOT_TOKEN1, secured_client);                       // BOT "Chat" //
-UniversalTelegramBot bot2(BOT_TOKEN2, secured_client);                         // BOT "Logs + LED" //
-//UniversalTelegramBot bot3(BOT_TOKEN3, secured_client);                       // BOT "Calibrate" //
-UniversalTelegramBot bot4(BOT_TOKEN4, secured_client);                         // BOT "Backup" //
-
-
-bool message_intruder_flag = true;
-byte users_array_index;
-bool shutdown_friends = false;
-const byte user_array_length = 7;
-
-class class_users
-{
-  public:
-    class_users(byte users_array_index, String id, bool alert_flag, bool admin_flag, bool need_supervision, String name)
-    {
-      _users_array_index = users_array_index;
-      _id = id;
-      _alert_flag = alert_flag;
-      _admin_flag = admin_flag;
-      _need_supervision = need_supervision;
-      _name = name;
-      _MessageState = 1;
-    }
-
-    void check_id(String CHAT_IDcur);            // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
-
-    void send_message(String input);             // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
-
-    void send_message_second_chat(String input)
-    {
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
-      bot4.sendMessage(_id, input, "");
-    }
-
-    void send_alert(String input)
-    {
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
-      if (_alert_flag == true)
-      {
-        bot2.sendMessage(_id, input, "");
-      }
-    }
-
-    void set_id(String id)
-    {
-      _id = id;
-    }
-
-    String get_id()
-    {
-      return _id;
-    }
-
-    void set_alert_flag()
-    {
-      _alert_flag = !_alert_flag;
-      if(_alert_flag == true)
-      {
-        bot2.sendMessage(_id, "Текстовые уведомления ВКЛЮЧЕНЫ.", "");
-      }
-      else
-      {
-        bot2.sendMessage(_id, "Текстовые уведомления ОТКЛЮЧЕНЫ.", "");
-      }
-    }
-
-    unsigned int get_message_state()
-    {
-      return(_MessageState);
-    }
-
-    void set_message_state(unsigned int MessageState)
-    {
-      _MessageState = MessageState;
-    }
-
-    bool get_admin_flag()
-    {
-      return(_admin_flag);
-    }
-
-  private:
-    byte _users_array_index;                               // индекс пользователя (объекта) в массиве //
-    String _id;                                            // ID пользователя //
-    bool _alert_flag;                                      // true - отправляются уведомления алерты //
-    bool _admin_flag;                                      // true - права администратора //
-    bool _need_supervision;                                // true - при запросе сообщает мне. Нужно, чтобы понимать если кто-то обращается к боту вне групп и я не вижу сообщений //
-    String _name;                                          // Имя пользователя //
-    unsigned int _MessageState;                            // стейт сообщений //
-};
-
-class_users object_array_users[user_array_length] =
-{
-  class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
-  class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
-  class_users(2, USER_ID2_debug,         false, false, false, "Debug"),                               // Группа для дебаг-сообщений //  
-  class_users(3, USER_ID3_Kate_group,    false, false, false, "Катя - группа"),                      // Катя - айди группы //
-  class_users(4, USER_ID4_Kate_personal, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
-  class_users(5, USER_ID5_Sasha_group,   false, false, false, "Саша - группа"),                      // Саша - айди группы //
-  class_users(6, USER_ID6_Slava_Artem,   false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
-};
-
-void class_users::send_message(String input)
-{
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  bot2.sendMessage(_id, input, "");
-  if(_need_supervision == true)
-  {
-    object_array_users[0].send_message(String("Ответил, ") + _name + ":\n\n" + input);
-  }
-}
-
-void class_users::check_id(String CHAT_IDcur)
-{
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  if(CHAT_IDcur == _id)
-  {
-    users_array_index = _users_array_index;
-    message_intruder_flag = false;
-    
-    if(_need_supervision == true)
-    {
-      object_array_users[0].send_message(_name + ", написал:\n\n" + bot2.messages[0].text);
-    }        
-  }
-}
-
-void message_id_check(String CHAT_IDcur)                          // Права доступа //
-{
-  message_intruder_flag = true;
-
-  object_array_users[0].check_id(CHAT_IDcur);
-  if(shutdown_friends == false)
-  {
-    for(int i = 1; i < user_array_length; i++)
-    {
-      object_array_users[i].check_id(CHAT_IDcur);
-    }
-  }
-}
-
-void send_alert(String input_message)
-{
-  for(int i = 0; i < user_array_length; i++)
-  {
-    object_array_users[i].send_alert(input_message);
-  }
-}
-
-
-///↓↓↓ ВРЕМЯ ↓↓↓///
-
-
-class class_TimeDate                             // класс Даты и Времени //
-{
-  public:
-    class_TimeDate()                             // конструктор класса //
-    {
-      _UTC_time = 0;
-    }
-
-    void update_TimeDate()                       // обновление текущей даты и времени
-    {
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
-      _UTC_time = time(nullptr);
-      struct tm* L_tm = localtime(&_UTC_time);
-
-      String buf_Date_YEAR = String(L_tm->tm_year + 1900);
-      String buf_Date_MONTH = String(L_tm->tm_mon + 1);
-      String buf_Date_DAY = String(L_tm->tm_mday);
-      String buf_Time_HOUR = String(L_tm->tm_hour);
-      String buf_Time_MIN = String(L_tm->tm_min);
-      String buf_Time_SEC = String(L_tm->tm_sec);
-
-      _TimeHOUR = buf_Time_HOUR.toInt();
-      _TimeMIN = buf_Time_MIN.toInt();
-      _TimeSEC = buf_Time_SEC.toInt();
-
-      if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
-      {
-        buf_Date_MONTH = String("0" + buf_Date_MONTH);
-      }
-
-      if (buf_Date_DAY.toInt() >= 0 && buf_Date_DAY.toInt() < 10)
-      {
-        buf_Date_DAY = String("0" + buf_Date_DAY);
-      }
-
-      if (buf_Time_HOUR.toInt() >= 0 && buf_Time_HOUR.toInt() < 10)
-      {
-        buf_Time_HOUR = String("0" + buf_Time_HOUR);
-      }
-
-      if (buf_Time_MIN.toInt() >= 0 && buf_Time_MIN.toInt() < 10)
-      {
-        buf_Time_MIN = String ("0" + buf_Time_MIN);
-      }
-
-      if (buf_Time_SEC.toInt() >= 0 && buf_Time_SEC.toInt() < 10)
-      {
-        buf_Time_SEC = String ("0" + buf_Time_SEC);
-      }
-
-      _DateMONTH = buf_Date_MONTH.toInt();
-      _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
-      _TimeA = String(buf_Time_HOUR + ":" + buf_Time_MIN + ":" + buf_Time_SEC);
-      String buf_TimeB = String(buf_Time_HOUR + buf_Time_MIN + buf_Time_SEC);
-      _TimeB = buf_TimeB.toInt();
-      _DateTimeFULL = String(_DateFULL + " " + _TimeA);
-    }
-
-    void set_UTC_time()
-    {
-      configTime(10800, 0, "pool.ntp.org");            // get UTC time via NTP // не работает - "time.nist.gov" //
-      secured_client.setTrustAnchors(&cert);                                  // Add root certificate for api.telegram.org //
-
-
-      while (1717656000 > _UTC_time || _UTC_time > 4102444800)                  // не начинаем основной луп, пока не получим время //
-      {
-        _UTC_time = time(nullptr);
-        delay (500);
-      }
-    }
-
-    time_t get_UTC()
-    {
-      return(_UTC_time);
-    }
-
-    byte get_HOUR()
-    {
-      return(_TimeHOUR);
-    }
-
-    byte get_MIN()
-    {
-      return(_TimeMIN);
-    }
-
-    byte get_SEC()
-    {
-      return(_TimeSEC);
-    }
-
-    String get_DateFULL()
-    {
-      return(_DateFULL);
-    }
-
-    String get_DateTimeFULL()
-    {
-      return(_DateTimeFULL);
-    }
-
-    String get_TimeA()
-    {
-      return(_TimeA);
-    }
-
-    long get_TimeB()
-    {
-      return(_TimeB);
-    }
-
-    byte get_DateMONTH()
-    {
-      return(_DateMONTH);
-    }
-    
-    bool get_FLAG_minute()
-    {
-      return(_flag_every_minute_timer);
-    }
-
-  private:
-    time_t _UTC_time;                            // Время в секундах //
-    bool _flag_every_minute_timer = false;       // Флаг для таймера каждую четную/нечетную минуту // true - четная // false - нечетная //
-
-
-    byte _TimeHOUR;                              // часы //
-    byte _TimeMIN;                               // минуты //
-    byte _TimeSEC;                               // секунды //
-    
-    byte _DateMONTH;                             // месяц //
-
-    String _DateFULL;                            //дата в формате 2024-06-24 //
-    String _DateTimeFULL;                        //дата и время в формате 2024-06-24 11:48:39 //
-    String _TimeA;                               //время в формате 22:01:02 //
-    long _TimeB;                                 //время в формате 220102 //
-};
-
-class_TimeDate object_TimeDate;                  // создаем экземпляр класса class_TimeDate (объект) //
-
-bool flag_every_minute_timer = false;            // флаг для таймера каждую четную/нечетную минуту //   
 
 
 ///↓↓↓ НОЧНОЙ РЕЖИМ ↓↓↓///
@@ -637,48 +297,6 @@ String SYNCdata;                                 // стринг для полу
 bool flag_every_day_timer = false;               // флаг для отправки лога раз в сутки //
 
 
-///↓↓↓ ПЕРЕЗАГРУЗКА ↓↓↓///
-
-
-bool esp_restart_flag = false;
-bool skip_one_iteration = true;
-
-void restart_check()
-{
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-  
-  if(esp_restart_flag == true)
-  {
-    if(skip_one_iteration == true)
-    {
-      skip_one_iteration = false;
-    }
-
-    else
-    {
-      ESP.restart();
-    }
-  }
-}
-
-
-///↓↓↓ ОТЛАДКА - 2 ↓↓↓///
-
-
-void send_reset_info()
-{
-  String Jesse_reset_reason = ESP.getResetReason();
-  String Jesse_reset_info = ESP.getResetInfo();
-  String buf_message = "Причина перезагрузки: ";
-  buf_message += Jesse_reset_reason;
-  buf_message += "\nДополнительная информация: ";
-  buf_message += Jesse_reset_info;
-  send_alert(buf_message);
-}
-
-
 ///   ///   ///   ///   ///   ///   ///
 
 
@@ -722,7 +340,7 @@ void loop()                                      // основной луп //
   object_NightTime.update_NightTime();                                         // обновляем состояние ночного режима //
 
 
-  if (bot2.getUpdates(bot2.last_message_received + 1) != 0)                    // если есть новые сообщения обрабатываем одно //
+  if (bot_main.getUpdates(bot_main.last_message_received + 1) != 0)                    // если есть новые сообщения обрабатываем одно //
   {
     LEDhello();                                                                // включаем три светодиода для индикации начала обработки входящего сообщения //
     Message_from_Telegram_converter();
@@ -758,421 +376,362 @@ void loop()                                      // основной луп //
     restart_check();
     flag_every_minute_timer = false;
   }
-
 }
 
-void Message_from_Telegram_converter()           // преобразование сообщение из Телеграм в команду //
+
+void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  String CHAT_IDcur = bot2.messages[0].chat_id;
-  message_id_check(CHAT_IDcur);
-
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  if (message_intruder_flag == false)
+  switch (object_array_users[users_array_index].get_message_state())
   {
-    String income_message = bot2.messages[0].text;
-
-    byte dividerIndex_1 = income_message.indexOf('@');                         // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
-    String message_part_2 = income_message.substring(dividerIndex_1 + 1);      // записывает в message_part_2 "JOArduinoChatBOT" //
-    String message_part_1 = income_message.substring(0, dividerIndex_1);       // записывает в message_part_1 "/back" //
-
-    if (message_part_2 != "JOArduinoChatBOT")                            // если сообщение не для него, то пропускает его //
+    case 104:                                // яркость //
     {
-      Message_command_executer(message_part_1);
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      HSVval1day = constrain(buf_text_int, 0, 255);
+      HSVval2day = (HSVval1day/2);
+      HSVval1cur = HSVval1day;
+      HSVval2cur = HSVval2day;
+      FillSolidMY();
+      object_array_users[users_array_index].send_message("Яркость бра и линии днём установлена: " + String(HSVval1day));
+      break;            
+    }
+
+    case 105:                                // яркость часов днём //
+    {
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      HSVval3day = constrain(buf_text_int, 0, 255);
+      HSVval3cur = HSVval3day;
+      clock_master();
+      object_array_users[users_array_index].send_message("Яркость часов днём установлена: " + String(HSVval3day));     
+      break;   
+    } 
+
+    case 106:                                // яркость часов ночью //  
+    {
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      HSVval3night = constrain(buf_text_int, 0, 40);
+      HSVval3cur = HSVval3night;
+      clock_master();
+      object_array_users[users_array_index].send_message("Яркость часов ночью установлена: " + String(HSVval3night));       
+      break;   
+    }
+
+    case 110:                               // интервал смены цвета часов днём //  
+    {
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      timer_min_hue_clock_target = constrain(buf_text_int, 1, 10080);
+      object_array_users[users_array_index].send_message("Интервал смена цвета часов установлен: " + String(timer_min_hue_clock_target));
+      break;   
+    }
+
+    case 112:                               // ручной выбор цвета часов ночью //  
+    {
+      int text_int = text.toInt();
+      RGB_clock_night [2] = text_int % 10;
+      text_int /= 10;
+      RGB_clock_night [1] = text_int % 10;
+      text_int /= 10;
+      RGB_clock_night [0] = text_int % 10;
+      text_int /= 10;
+
+      object_array_users[users_array_index].send_message("Цвет (RGB) часов ночью установлен - " + String(RGB_clock_night [0]) + String(RGB_clock_night [1]) + String(RGB_clock_night [2]));
+      clock_master();
+      break;   
+    }
+
+    case 390:                               // выбор гостевого чата вручную //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_array_users[1].set_id(text);
+        object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
+        object_array_users[1].send_message("Я проснулся.");
+      }
+
+      else 
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
     }
   }
-
-  else
-  {
-    send_alert("INTRUDER: " + CHAT_IDcur);
-  }
+  object_array_users[users_array_index].set_message_state(1);
 }
 
-void Message_command_executer(String text)       // обработчик команд //
+void Message_command_send_data(int text_int)      // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  if(text == "/back")                                            // отмена ввода //
+  switch (text_int)
   {
-    if (object_array_users[users_array_index].get_message_state() == 1)
+    case 101:                                                       // запрос лога за текущий день //
     {
-      object_array_users[users_array_index].send_message("Команда для ввода данных не была выбрана. Посмотрите команды в меню.");
+      LOGread();
+      break;
     }
-    
-    else
+
+    case 102:                                                       // запрос первой строки excel //
     {
-      object_array_users[users_array_index].set_message_state(1);
-      object_array_users[users_array_index].send_message("Ввод данных отменен.");
+      object_array_users[users_array_index].send_message("Дата и Время, Температура в комнате, Влажность в комнате, СО2, Рекуп. Приток (in), Рекуп. Приток (out), Рекуп. Вытяжка (in), Рекуп. Вытяжка (out), КПД рекуп. на вытяжку (%), КПД рекуп. на приток (%), Реальное КПД на приток с учётом теплопотерь, Воздуховод с улицы (°C), Батарея (°C), Воздуховод с батареи (°C), Объединенный поток после фильтров(°C), Теплопотери от улицы до рекуператора (°C), Теплопотери воздухувода от кровати до рекуп. и нагрев вентилятором (°C), % воздуха c улицы, % воздуха c батареи, Текущее положение заслонок, Шагов за сутки (без учета калибровки)");
+      break;
     }
-  }
 
-  else if (object_array_users[users_array_index].get_message_state() != 1)                                         // если MessageState != 1, то значит ожидаем ввод данных //
-  {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    switch (object_array_users[users_array_index].get_message_state())
+    case 10300:                                                     // отключить ночной режим //
     {
-      case 104:                                // яркость //
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        HSVval1day = constrain(buf_text_int, 0, 255);
-        HSVval2day = (HSVval1day/2);
-        HSVval1cur = HSVval1day;
-        HSVval2cur = HSVval2day;
-        FillSolidMY();
-        object_array_users[users_array_index].send_message("Яркость бра и линии днём установлена: " + String(HSVval1day));
-        break;            
-      }
-
-      case 105:                                // яркость часов днём //
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        HSVval3day = constrain(buf_text_int, 0, 255);
-        HSVval3cur = HSVval3day;
-        clock_master();
-        object_array_users[users_array_index].send_message("Яркость часов днём установлена: " + String(HSVval3day));     
-        break;   
-      } 
-
-      case 106:                                // яркость часов ночью //  
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        HSVval3night = constrain(buf_text_int, 0, 40);
-        HSVval3cur = HSVval3night;
-        clock_master();
-        object_array_users[users_array_index].send_message("Яркость часов ночью установлена: " + String(HSVval3night));       
-        break;   
-      }
-
-      case 110:                               // интервал смены цвета часов днём //  
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        timer_min_hue_clock_target = constrain(buf_text_int, 1, 10080);
-        object_array_users[users_array_index].send_message("Интервал смена цвета часов установлен: " + String(timer_min_hue_clock_target));
-        break;   
-      }
-
-      case 112:                               // ручной выбор цвета часов ночью //  
-      {
-        int text_int = text.toInt();
-        RGB_clock_night [2] = text_int % 10;
-        text_int /= 10;
-        RGB_clock_night [1] = text_int % 10;
-        text_int /= 10;
-        RGB_clock_night [0] = text_int % 10;
-        text_int /= 10;
-
-        object_array_users[users_array_index].send_message("Цвет (RGB) часов ночью установлен - " + String(RGB_clock_night [0]) + String(RGB_clock_night [1]) + String(RGB_clock_night [2]));
-        clock_master();
-        break;   
-      }
-
-      case 390:                               // выбор гостевого чата вручную //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_array_users[1].set_id(text);
-          object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
-          object_array_users[1].send_message("Я проснулся.");
-        }
-
-        else 
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;  
-      }
+      HSVval1cur = HSVval1day;
+      HSVval2cur = HSVval2day;
+      HSVval3cur = HSVval3day;
+      object_NightTime.set_NightTimeState(NightTime::State::MANUAL_OFF);
+      object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+      FillSolidMY();
+      clock_master();
+      object_array_users[users_array_index].send_message("Ночной режим принудительно ВЫКЛЮЧЕН до вечера (Ночью в любом случае не будет появляться анимация ошибки).");
+      break;
     }
-    object_array_users[users_array_index].set_message_state(1);      
-  }
 
-  else                                                                // если MessageState == 1, то значит ожидаем команду //
-  {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    byte dividerIndex_2 = text.indexOf('/');                     // ищем индекс разделителя "/" //
-    String buf_text = text.substring(dividerIndex_2 + 1);        // оставляем только команду "back" //
-
-    int text_int = buf_text.toInt();
-
-    switch (text_int)
+    case 10301:                                                     // включить ночной режим //
     {
-      case 101:                                                       // запрос лога за текущий день //
+      HSVval1cur = HSVval1night;
+      HSVval2cur = HSVval2night;
+      HSVval3cur = HSVval3night;
+      object_NightTime.set_NightTimeState(NightTime::State::MANUAL_ON);
+      object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+      FillSolidMY();
+      clock_master();
+      object_array_users[users_array_index].send_message("Ночной режим принудительно ВКЛЮЧЕН до утра (Днём перестанет появляться анимация ошибки).");
+      break;
+    }
+
+    case 104:                                                       // яркость бра и линии днём //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для изменения яркости бра и линии днём (от 0 до 255):\n\nТекущее значение: " + String(HSVval1day));
+      object_array_users[users_array_index].set_message_state(104);
+      break;
+    }
+
+    case 105:                                                       // яркость часов днём //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для изменения яркости часов в дневное время (от 0 до 255):\n\nТекущее значение: " + String(HSVval3day));
+      object_array_users[users_array_index].set_message_state(105);
+      break;
+    }
+
+    case 106:                                                       // яркость часов ночью //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для изменения яркости часов ночью (от 0 до 40):\n\nТекущее значение: " + String(HSVval3night));
+      object_array_users[users_array_index].set_message_state(106);
+      break;
+    }
+
+    case 107:                                                       // анимация "снизу вверх" //
+    {
+      Led_animation_up();
+      break;
+    }
+
+    case 108:                                                       // анимация "сверху вниз" //
+    {
+      Led_animation_down();
+      break;
+    }
+
+    case 109:                                                       // анимация "ошибка" //
+    {
+      Led_animation_error();
+      break;
+    }
+
+    case 110:                                                       // интервал смены цвета часов днём //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для установки интервала смены цвета часов днём, в минутах от 1 минуты до 7 дней (от 1 до 10080):\n\nТекущее значение: " + String(timer_min_hue_clock_target));
+      object_array_users[users_array_index].set_message_state(110);
+      break;
+    }
+
+    case 111:                                                       // выбор индикации данных на табло ночью //
+    {
+      object_array_users[users_array_index].send_message(clock_indication());
+      break;
+    }
+
+    case 11101:                                                     // ↑↑↑ // время //
+    {
+      clock_night_indication_time = !clock_night_indication_time;
+      clock_master();
+      object_array_users[users_array_index].send_message(clock_indication());
+      break;
+    }
+
+    case 11102:                                                     // ↑↑↑ // co2 //
+    {
+      clock_night_indication_co2 = !clock_night_indication_co2;
+      clock_master();
+      object_array_users[users_array_index].send_message(clock_indication());
+      break;
+    }
+
+    case 11103:                                                     // ↑↑↑ // температура //
+    {
+      clock_night_indication_temperature = !clock_night_indication_temperature;
+      clock_master();
+      object_array_users[users_array_index].send_message(clock_indication());
+      break;
+    }
+
+    case 11104:                                                     // ↑↑↑ // влажность //
+    {
+      clock_night_indication_humidity = !clock_night_indication_humidity;
+      clock_master();
+      object_array_users[users_array_index].send_message(clock_indication());
+      break;
+    }
+
+    case 112:                                                       // выбор цвета часов ночью //
+    {
+      String buf_message = "Выбор цвета часов ночью:";
+      buf_message += "\n\nКрасный - /11201";
+      buf_message += "\nЖелтый - /11202";
+      buf_message += "\nЗеленый - /11203";
+      buf_message += "\nГолубой - /11204";
+      buf_message += "\nСиний - /11205";
+      buf_message += "\nРозовый -/11206";
+      buf_message += "\n\nБелый - /11207";
+      buf_message += "\n\n\nВвести вручную RGB цвет - /11299";
+      object_array_users[users_array_index].send_message(buf_message);
+      break;
+    }
+
+    case 11201:                                                     // ↑↑↑ // Красный //
+    {
+      RGB_clock_night [0] = 1;
+      RGB_clock_night [1] = 0;
+      RGB_clock_night [2] = 0;
+      clock_master();
+      break;
+    }
+
+    case 11202:                                                     // ↑↑↑ // Желтый //
+    {
+      RGB_clock_night [0] = 1;
+      RGB_clock_night [1] = 1;
+      RGB_clock_night [2] = 0;
+      clock_master();
+      break;
+    }
+
+    case 11203:                                                     // ↑↑↑ // Зеленый //
+    {
+      RGB_clock_night [0] = 0;
+      RGB_clock_night [1] = 1;
+      RGB_clock_night [2] = 0;
+      clock_master();
+      break;
+    }
+
+    case 11204:                                                     // ↑↑↑ // Голубой //
+    {
+      RGB_clock_night [0] = 0;
+      RGB_clock_night [1] = 1;
+      RGB_clock_night [2] = 1;
+      clock_master();
+      break;
+    }
+
+    case 11205:                                                     // ↑↑↑ // Синий //
+    {
+      RGB_clock_night [0] = 0;
+      RGB_clock_night [1] = 0;
+      RGB_clock_night [2] = 1;
+      clock_master();
+      break;
+    }
+
+    case 11206:                                                     // ↑↑↑ // Розовый //
+    {
+      RGB_clock_night [0] = 1;
+      RGB_clock_night [1] = 0;
+      RGB_clock_night [2] = 1;
+      clock_master();
+      break;
+    }
+
+    case 11207:                                                     // ↑↑↑ // Белый //
+    {
+      RGB_clock_night [0] = 1;
+      RGB_clock_night [1] = 1;
+      RGB_clock_night [2] = 1;
+      clock_master();
+      break;
+    }
+
+    case 11299:                                                     // ручной выбор цвета часов ночью //
+    {
+      object_array_users[users_array_index].send_message("Отправьте 3 цифры для установки цвета часов ночью (текущее значение: " + String(RGB_clock_night [0]) + String(RGB_clock_night [1]) + String(RGB_clock_night [2]) + "). Первая цифра RED, вторая BLUE, третья GREEN. \n\n\n*Параметр яркости часов ночью является коэфициентов для RGB цвета.");
+      object_array_users[users_array_index].set_message_state(112);
+      break;
+    }
+
+    case 190:                              // ВКЛ/ВЫКЛ Текстовых уведомлений //
+    {
+      object_array_users[users_array_index].set_alert_flag();
+      break;
+    }
+
+    case 370:
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
       {
-        LOGread();
-        break;
+        object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
+        esp_restart_flag = true;
       }
 
-      case 102:                                                       // запрос первой строки excel //
+      else 
       {
-        object_array_users[users_array_index].send_message("Дата и Время, Температура в комнате, Влажность в комнате, СО2, Рекуп. Приток (in), Рекуп. Приток (out), Рекуп. Вытяжка (in), Рекуп. Вытяжка (out), КПД рекуп. на вытяжку (%), КПД рекуп. на приток (%), Реальное КПД на приток с учётом теплопотерь, Воздуховод с улицы (°C), Батарея (°C), Воздуховод с батареи (°C), Объединенный поток после фильтров(°C), Теплопотери от улицы до рекуператора (°C), Теплопотери воздухувода от кровати до рекуп. и нагрев вентилятором (°C), % воздуха c улицы, % воздуха c батареи, Текущее положение заслонок, Шагов за сутки (без учета калибровки)");
-        break;
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
       }
+      break;
+    }
 
-      case 10300:                                                     // отключить ночной режим //
+    case 380:
+    {
+      if (users_array_index == 0)
       {
-        HSVval1cur = HSVval1day;
-        HSVval2cur = HSVval2day;
-        HSVval3cur = HSVval3day;
-        object_NightTime.set_NightTimeState(NightTime::State::MANUAL_OFF);
-        object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
-        FillSolidMY();
-        clock_master();
-        object_array_users[users_array_index].send_message("Ночной режим принудительно ВЫКЛЮЧЕН до вечера (Ночью в любом случае не будет появляться анимация ошибки).");
-        break;
-      }
-
-      case 10301:                                                     // включить ночной режим //
-      {
-        HSVval1cur = HSVval1night;
-        HSVval2cur = HSVval2night;
-        HSVval3cur = HSVval3night;
-        object_NightTime.set_NightTimeState(NightTime::State::MANUAL_ON);
-        object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
-        FillSolidMY();
-        clock_master();
-        object_array_users[users_array_index].send_message("Ночной режим принудительно ВКЛЮЧЕН до утра (Днём перестанет появляться анимация ошибки).");
-        break;
-      }
-
-      case 104:                                                       // яркость бра и линии днём //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для изменения яркости бра и линии днём (от 0 до 255):\n\nТекущее значение: " + String(HSVval1day));
-        object_array_users[users_array_index].set_message_state(104);
-        break;
-      }
-
-      case 105:                                                       // яркость часов днём //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для изменения яркости часов в дневное время (от 0 до 255):\n\nТекущее значение: " + String(HSVval3day));
-        object_array_users[users_array_index].set_message_state(105);
-        break;
-      }
-
-      case 106:                                                       // яркость часов ночью //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для изменения яркости часов ночью (от 0 до 40):\n\nТекущее значение: " + String(HSVval3night));
-        object_array_users[users_array_index].set_message_state(106);
-        break;
-      }
-
-      case 107:                                                       // анимация "снизу вверх" //
-      {
-        Led_animation_up();
-        break;
-      }
-
-      case 108:                                                       // анимация "сверху вниз" //
-      {
-        Led_animation_down();
-        break;
-      }
-
-      case 109:                                                       // анимация "ошибка" //
-      {
-        Led_animation_error();
-        break;
-      }
-
-      case 110:                                                       // интервал смены цвета часов днём //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для установки интервала смены цвета часов днём, в минутах от 1 минуты до 7 дней (от 1 до 10080):\n\nТекущее значение: " + String(timer_min_hue_clock_target));
-        object_array_users[users_array_index].set_message_state(110);
-        break;
-      }
-
-      case 111:                                                       // выбор индикации данных на табло ночью //
-      {
-        object_array_users[users_array_index].send_message(clock_indication());
-        break;
-      }
-
-      case 11101:                                                     // ↑↑↑ // время //
-      {
-        clock_night_indication_time = !clock_night_indication_time;
-        clock_master();
-        object_array_users[users_array_index].send_message(clock_indication());
-        break;
-      }
-
-      case 11102:                                                     // ↑↑↑ // co2 //
-      {
-        clock_night_indication_co2 = !clock_night_indication_co2;
-        clock_master();
-        object_array_users[users_array_index].send_message(clock_indication());
-        break;
-      }
-
-      case 11103:                                                     // ↑↑↑ // температура //
-      {
-        clock_night_indication_temperature = !clock_night_indication_temperature;
-        clock_master();
-        object_array_users[users_array_index].send_message(clock_indication());
-        break;
-      }
-
-      case 11104:                                                     // ↑↑↑ // влажность //
-      {
-        clock_night_indication_humidity = !clock_night_indication_humidity;
-        clock_master();
-        object_array_users[users_array_index].send_message(clock_indication());
-        break;
-      }
-
-      case 112:                                                       // выбор цвета часов ночью //
-      {
-        String buf_message = "Выбор цвета часов ночью:";
-        buf_message += "\n\nКрасный - /11201";
-        buf_message += "\nЖелтый - /11202";
-        buf_message += "\nЗеленый - /11203";
-        buf_message += "\nГолубой - /11204";
-        buf_message += "\nСиний - /11205";
-        buf_message += "\nРозовый -/11206";
-        buf_message += "\n\nБелый - /11207";
-        buf_message += "\n\n\nВвести вручную RGB цвет - /11299";
-        object_array_users[users_array_index].send_message(buf_message);
-        break;
-      }
-
-      case 11201:                                                     // ↑↑↑ // Красный //
-      {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 0;
-        RGB_clock_night [2] = 0;
-        clock_master();
-        break;
-      }
-
-      case 11202:                                                     // ↑↑↑ // Желтый //
-      {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 0;
-        clock_master();
-        break;
-      }
-
-      case 11203:                                                     // ↑↑↑ // Зеленый //
-      {
-        RGB_clock_night [0] = 0;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 0;
-        clock_master();
-        break;
-      }
-
-      case 11204:                                                     // ↑↑↑ // Голубой //
-      {
-        RGB_clock_night [0] = 0;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 1;
-        clock_master();
-        break;
-      }
-
-      case 11205:                                                     // ↑↑↑ // Синий //
-      {
-        RGB_clock_night [0] = 0;
-        RGB_clock_night [1] = 0;
-        RGB_clock_night [2] = 1;
-        clock_master();
-        break;
-      }
-
-      case 11206:                                                     // ↑↑↑ // Розовый //
-      {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 0;
-        RGB_clock_night [2] = 1;
-        clock_master();
-        break;
-      }
-
-      case 11207:                                                     // ↑↑↑ // Белый //
-      {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 1;
-        clock_master();
-        break;
-      }
-
-      case 11299:                                                     // ручной выбор цвета часов ночью //
-      {
-        object_array_users[users_array_index].send_message("Отправьте 3 цифры для установки цвета часов ночью (текущее значение: " + String(RGB_clock_night [0]) + String(RGB_clock_night [1]) + String(RGB_clock_night [2]) + "). Первая цифра RED, вторая BLUE, третья GREEN. \n\n\n*Параметр яркости часов ночью является коэфициентов для RGB цвета.");
-        object_array_users[users_array_index].set_message_state(112);
-        break;
-      }
-
-      case 190:                              // ВКЛ/ВЫКЛ Текстовых уведомлений //
-      {
-        object_array_users[users_array_index].set_alert_flag();
-        break;
-      }
-
-      case 370:
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
+        shutdown_friends = !shutdown_friends;
+        if(shutdown_friends == true)
         {
-          object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
-          esp_restart_flag = true;
+          object_array_users[users_array_index].send_message("Отключил возможность управления из друх чатов.");
         }
-
-        else 
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
-      }
-
-      case 380:
-      {
-        if (users_array_index == 0)
-        {
-          shutdown_friends = !shutdown_friends;
-          if(shutdown_friends == true)
-          {
-            object_array_users[users_array_index].send_message("Отключил возможность управления из друх чатов.");
-          }
-          else
-          {
-            object_array_users[users_array_index].send_message("Восстановил возможность управления из других чатов.");
-          }
-        }
-
         else
         {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }        
-        break;
+          object_array_users[users_array_index].send_message("Восстановил возможность управления из других чатов.");
+        }
       }
 
-      case 390:                              // выбор гостевого чата кнопки //
+      else
       {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_array_users[users_array_index].send_message("Отправьте ID группы или профиля, чтобы я отправился туда. Я продолжу отвечать на ваши запросы!");
-          object_array_users[users_array_index].set_message_state(390);
-        }
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }        
+      break;
+    }
 
-        else 
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
+    case 390:                              // выбор гостевого чата кнопки //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_array_users[users_array_index].send_message("Отправьте ID группы или профиля, чтобы я отправился туда. Я продолжу отвечать на ваши запросы!");
+        object_array_users[users_array_index].set_message_state(390);
       }
+
+      else 
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
     }
   }
 }
@@ -1252,7 +811,7 @@ void LOGtimer()                                  // отправка лога в
     if (myFile)
     {
       int size = myFile.size();
-      String response = bot4.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[0].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
+      String response = bot_second.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[0].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
     }
 
     else
@@ -1337,7 +896,7 @@ void LOGread()                                   // чтение лога //
   if (myFile)
   {
     int size = myFile.size();
-    String response=bot2.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[users_array_index].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
+    String response=bot_main.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[users_array_index].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
   }
 
   else

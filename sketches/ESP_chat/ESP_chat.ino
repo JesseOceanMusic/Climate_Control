@@ -1,357 +1,17 @@
-///↓↓↓ ОТЛАДКА - 1 ↓↓↓///
+//Tools > MMU 16KB cache + 48KB IRAM and 2nd HEAP (shared)
+//Tools > Stack Protection Enable
+//NodeMCU 1.0 (ESP-12E Module)
+
+#define THIS_IS_CHAT_CODE
+
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_001\Common_CODE.cpp"
+
+///↓↓↓ ОТЛАДКА ↓↓↓///
 
 
 //#define Jesse_DEBUG_free_heap
-#ifdef Jesse_DEBUG_free_heap
-  time_t Jesse_debug_free_heap_timer;
-#endif
-
 //#define Jesse_DEBUG_loop_millis_measure
-#ifdef Jesse_DEBUG_loop_millis_measure
-  long test_timer;
-#endif
-
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
-
-
-/// ↓↓↓ ТЕЛЕГРАМ ↓↓↓ ///
-
-
-#include <ESP8266WiFi.h>                         // Telegram библиотеки //
-#include <WiFiClientSecure.h>                    // ↑↑↑ //
-#include <UniversalTelegramBot.h>                // ↑↑↑ //
-#include <ArduinoJson.h>                         // ↑↑↑ //
-
-
-#include "Sensetive_INFO.cpp"                    // логины/пароли/токены/id //
-  /*
-  WIFI_SSID
-  WIFI_PASSWORD
-  BOT_TOKEN1
-  BOT_TOKEN2
-  BOT_TOKEN3
-  BOT_TOKEN4
-  USER_ID0
-  USER_ID1
-  USER_ID2
-  USER_ID3
-  USER_ID4
-  USER_ID5
-  USER_ID6
-*/
-
-X509List cert(TELEGRAM_CERTIFICATE_ROOT);                       // какой-то сертификат //
-WiFiClientSecure secured_client;                                // какой-то secured client //
-
-UniversalTelegramBot bot1(BOT_TOKEN1, secured_client);          // BOT "Chat" //
-//UniversalTelegramBot bot2(BOT_TOKEN2, secured_client);        // BOT "Logs + LED" //
-UniversalTelegramBot bot3(BOT_TOKEN3, secured_client);          // BOT "Calibrate" //
-//UniversalTelegramBot bot4(BOT_TOKEN4, secured_client);        // BOT "Backup" //
-
-bool message_intruder_flag = true;
-byte users_array_index;
-bool shutdown_friends = false;
-
-class class_users
-{
-  public:
-    class_users(byte users_array_index, String id, bool alert_flag, bool admin_flag, bool need_supervision, String name)
-    {
-      _users_array_index = users_array_index;
-      _id = id;
-      _alert_flag = alert_flag;
-      _admin_flag = admin_flag;
-      _need_supervision = need_supervision;
-      _name = name;
-      _MessageState = 1;
-    }
-
-    void check_id(String CHAT_IDcur);            // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
-
-    void send_message(String input);             // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
-
-    void send_message_second_chat(String input)
-    {
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-
-      bot3.sendMessage(_id, input, "");
-    }
-
-    void send_alert(String input)
-    {
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-      
-      if (_alert_flag == true)
-      {
-        bot1.sendMessage(_id, input, "");
-      }
-    }
-
-    void set_id(String id)
-    {
-      _id = id;
-    }
-
-    String get_id()
-    {
-      return _id;
-    }
-
-    void set_alert_flag()
-    {
-      _alert_flag = !_alert_flag;
-      if(_alert_flag == true)
-      {
-        bot1.sendMessage(_id, "Текстовые уведомления ВКЛЮЧЕНЫ.", "");
-      }
-      else
-      {
-        bot1.sendMessage(_id, "Текстовые уведомления ОТКЛЮЧЕНЫ.", "");
-      }
-    }
-
-    unsigned int get_message_state()
-    {
-      return(_MessageState);
-    }
-
-    void set_message_state(unsigned int MessageState)
-    {
-      _MessageState = MessageState;
-    }
-
-    bool get_admin_flag()
-    {
-      return(_admin_flag);
-    }
-
-  private:
-    byte _users_array_index;                               // индекс пользователя (объекта) в массиве //
-    String _id;                                            // ID пользователя //
-    bool _alert_flag;                                      // true - отправляются уведомления алерты //
-    bool _admin_flag;                                      // true - права администратора //
-    bool _need_supervision;                                // true - при запросе сообщает мне. Нужно, чтобы понимать если кто-то обращается к боту вне групп и я не вижу сообщений //
-    String _name;                                          // Имя пользователя //
-    unsigned int _MessageState;                            // стейт сообщений //
-};
-
-const byte user_array_length = 7;
-class_users object_array_users[user_array_length] =
-{
-  class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
-  class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
-  class_users(2, USER_ID2_debug,         false, false, false, "Debug"),                               // Группа для дебаг-сообщений //  
-  class_users(3, USER_ID3_Kate_group,    false, false, false, "Катя - группа"),                      // Катя - айди группы //
-  class_users(4, USER_ID4_Kate_personal, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
-  class_users(5, USER_ID5_Sasha_group,   false, false, false, "Саша - группа"),                      // Саша - айди группы //
-  class_users(6, USER_ID6_Slava_Artem,   false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
-};
-
-void class_users::send_message(String input)
-{
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  bot1.sendMessage(_id, input, "");
-  if(_need_supervision == true)
-  {
-    object_array_users[0].send_message(String("Ответил, ") + _name + ":\n\n" + input);
-  }
-}
-
-void class_users::check_id(String CHAT_IDcur)
-{
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  if(CHAT_IDcur == _id)
-  {
-    users_array_index = _users_array_index;
-    message_intruder_flag = false;
-    
-    if(_need_supervision == true)
-    {
-      object_array_users[0].send_message(_name + ", написал:\n\n" + bot1.messages[0].text);
-    }        
-  }
-}
-
-void message_id_check(String CHAT_IDcur)                          // Права доступа //
-{
-  message_intruder_flag = true;
-
-  object_array_users[0].check_id(CHAT_IDcur);
-  if(shutdown_friends == false)
-  {
-    for(int i = 1; i < user_array_length; i++)
-    {
-      object_array_users[i].check_id(CHAT_IDcur);
-    }
-  }
-}
-
-void send_alert(String input_message)
-{
-  for(int i = 0; i < user_array_length; i++)
-  {
-    object_array_users[i].send_alert(input_message);
-  }
-}
-
-
-/// ↓↓↓ ВРЕМЯ ↓↓↓ ///
-
-
-class class_TimeDate                             // класс Даты и Времени //
-{
-  public:
-    class_TimeDate()                             // конструктор класса //
-    {
-      _UTC_time = 0;
-    }
-
-    void update_TimeDate()                       // обновление текущей даты и времени
-    {
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif
-            
-      _UTC_time = time(nullptr);
-      struct tm* L_tm = localtime(&_UTC_time);
-
-      String buf_Date_YEAR = String(L_tm->tm_year + 1900);
-      String buf_Date_MONTH = String(L_tm->tm_mon + 1);
-      String buf_Date_DAY = String(L_tm->tm_mday);
-      String buf_Time_HOUR = String(L_tm->tm_hour);
-      String buf_Time_MIN = String(L_tm->tm_min);
-      String buf_Time_SEC = String(L_tm->tm_sec);
-
-      _TimeHOUR = buf_Time_HOUR.toInt();
-      _TimeMIN = buf_Time_MIN.toInt();
-      _TimeSEC = buf_Time_SEC.toInt();
-
-      if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
-      {
-        buf_Date_MONTH = String("0" + buf_Date_MONTH);
-      }
-
-      if (buf_Date_DAY.toInt() >= 0 && buf_Date_DAY.toInt() < 10)
-      {
-        buf_Date_DAY = String("0" + buf_Date_DAY);
-      }
-
-      if (buf_Time_HOUR.toInt() >= 0 && buf_Time_HOUR.toInt() < 10)
-      {
-        buf_Time_HOUR = String("0" + buf_Time_HOUR);
-      }
-
-      if (buf_Time_MIN.toInt() >= 0 && buf_Time_MIN.toInt() < 10)
-      {
-        buf_Time_MIN = String ("0" + buf_Time_MIN);
-      }
-
-      if (buf_Time_SEC.toInt() >= 0 && buf_Time_SEC.toInt() < 10)
-      {
-        buf_Time_SEC = String ("0" + buf_Time_SEC);
-      }
-
-      _DateMONTH = buf_Date_MONTH.toInt();
-      _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
-      _TimeA = String(buf_Time_HOUR + ":" + buf_Time_MIN + ":" + buf_Time_SEC);
-      String buf_TimeB = String(buf_Time_HOUR + buf_Time_MIN + buf_Time_SEC);
-      _TimeB = buf_TimeB.toInt();
-      _DateTimeFULL = String(_DateFULL + " " + _TimeA);
-    }
-
-    void set_UTC_time()
-    {
-      configTime(10800, 0, "pool.ntp.org");            // get UTC time via NTP // не работает - "time.nist.gov" //
-      secured_client.setTrustAnchors(&cert);                                  // Add root certificate for api.telegram.org //
-
-
-      while (1717656000 > _UTC_time || _UTC_time > 4102444800)                  // не начинаем основной луп, пока не получим время //
-      {
-        _UTC_time = time(nullptr);
-        delay (500);
-      }
-    }
-
-    time_t get_UTC()
-    {
-      return(_UTC_time);
-    }
-
-    byte get_HOUR()
-    {
-      return(_TimeHOUR);
-    }
-
-    byte get_MIN()
-    {
-      return(_TimeMIN);
-    }
-
-    byte get_SEC()
-    {
-      return(_TimeSEC);
-    }
-
-    String get_DateFULL()
-    {
-      return(_DateFULL);
-    }
-
-    String get_DateTimeFULL()
-    {
-      return(_DateTimeFULL);
-    }
-
-    String get_TimeA()
-    {
-      return(_TimeA);
-    }
-
-    long get_TimeB()
-    {
-      return(_TimeB);
-    }
-
-    byte get_DateMONTH()
-    {
-      return(_DateMONTH);
-    }
-    
-    bool get_FLAG_minute()
-    {
-      return(_flag_every_minute_timer);
-    }
-
-  private:
-    time_t _UTC_time;                            // Время в секундах //
-    bool _flag_every_minute_timer = false;       // Флаг для таймера каждую четную/нечетную минуту // true - четная // false - нечетная //
-
-
-    byte _TimeHOUR;                              // часы //
-    byte _TimeMIN;                               // минуты //
-    byte _TimeSEC;                               // секунды //
-    
-    byte _DateMONTH;                             // месяц //
-
-    String _DateFULL;                            //дата в формате 2024-06-24 //
-    String _DateTimeFULL;                        //дата и время в формате 2024-06-24 11:48:39 //
-    String _TimeA;                               //время в формате 22:01:02 //
-    long _TimeB;                                 //время в формате 220102 //
-};
-
-class_TimeDate object_TimeDate;                  // создаем экземпляр класса class_TimeDate (объект) //
-
-bool flag_every_minute_timer = false;            // флаг для таймера каждую четную/нечетную минуту //   
 
 
 /// ↓↓↓ ДЛЯ СИНХРОНИЗАЦИИ ОШИБОК ↓↓↓ ///
@@ -987,12 +647,18 @@ class_motor_main object_motor_main;
 
 #include "Adafruit_SHT4x.h"
 
-#define relay D0
+const byte pin_PWM_Humidifier = 15;              // D8 - пин ШИМ/PWM для шагового двигателя увлажнителя.
+
+/*
+int PWM_freq_cur   = 50;             // Количество шагов в секунду. Один оборот вала 1600Hz (200 шагов * 8 микрошагов).  
+int PWM_freq_step  = 20;              // Шаг изменения частоты (раз в две минуты).
+int PWM_freq_max   = 400;             // Максимальная частота.
+*/
 
 Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
-float room_humidity_range  =  5.00;              // чувствительность +- включения выключения увлажнителя //
-float room_humidity_target = 35.00;              // желаемая влажность //
+float room_humidity_range  =  4.00;              // чувствительность +- включения выключения увлажнителя //
+float room_humidity_target = 40.00;              // желаемая влажность //
 
 const int humidity_month_start = 9;              // первый месяц работы увлажнителя 9 (сентябрь) //
 const int humidity_month_end   = 4;              // последний месяц работы увлажнителя 4 (апрель) //
@@ -1299,44 +965,6 @@ class SCD41                                      // класс датчика С
 SCD41 object_CO2_sensor;                         
 
 
-///↓↓↓ ПЕРЕЗАГРУЗКА ↓↓↓///
-
-
-bool esp_restart_flag = false;
-bool skip_one_iteration = true;
-
-void restart_check()
-{
-    if(esp_restart_flag == true)
-  {
-    if(skip_one_iteration == true)
-    {
-      skip_one_iteration = false;
-    }
-
-    else
-    {
-      ESP.restart();
-    }
-  }
-}
-
-
-///↓↓↓ ОТЛАДКА - 2 ↓↓↓///
-
-
-void send_reset_info()
-{
-  String Jesse_reset_reason = ESP.getResetReason();
-  String Jesse_reset_info = ESP.getResetInfo();
-  String buf_message = "Причина перезагрузки: ";
-  buf_message += Jesse_reset_reason;
-  buf_message += "\nДополнительная информация: ";
-  buf_message += Jesse_reset_info;
-  send_alert(buf_message);
-}
-
-
 ///   ///   ///   ///   ///   ///   ///
 
 
@@ -1358,8 +986,7 @@ void setup()                                     // стандартная фу�
   pinMode(pin_step_HOME,  OUTPUT);               // ↑↑↑ // шаговый двигатель заслонки от батареи //
   pinMode(pin_DIR,        OUTPUT);               // ↑↑↑ // общий пин direction (направление вращения двигателей) //
 
-  pinMode     (relay,     OUTPUT);               // определяем пин реле, как output //
-  digitalWrite(relay,        LOW);               // на всякий случай выключаем реле при запуске //
+  analogWrite(pin_PWM_Humidifier, 0);            // от 0 до 255 // при старте увлажнитель выключен //
 
   ds.begin();                                    // инициализация датчиков температуры по шине OneWire //
 
@@ -1404,17 +1031,13 @@ void loop()                                      // основной луп //
 
   close_air_dumpers_fast();                                                         // меняем быстро положение заслонок, если включили режим рекуперации //
 
-  if (bot1.getUpdates(bot1.last_message_received + 1) != 0)                         // если есть новые сообщения обрабатываем одно //
+  if (bot_main.getUpdates(bot_main.last_message_received + 1) != 0)                 // если есть новые сообщения обрабатываем одно //
   {
     Message_from_Telegram_converter();
   }
 
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)         // таймер каждую нечетную минуту //
   {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif    
-
     update_sensors_data_and_calculations();                      
     SYNCstart();
 
@@ -1441,539 +1064,480 @@ void loop()                                      // основной луп //
   }
 }
 
-void Message_from_Telegram_converter()           // преобразование сообщение из Телеграм в команду //
+void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  String CHAT_IDcur = bot1.messages[0].chat_id;
-  message_id_check(CHAT_IDcur);
-
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-    
-  if (message_intruder_flag == false)
+  switch (object_array_users[users_array_index].get_message_state())
   {
-    String income_message = bot1.messages[0].text;
-
-    byte dividerIndex_1 = income_message.indexOf('@');                         // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
-    String message_part_2 = income_message.substring(dividerIndex_1 + 1);      // записывает в message_part_2 "JOArduinoChatBOT" //
-    String message_part_1 = income_message.substring(0, dividerIndex_1);       // записывает в message_part_1 "/back" //
-
-    if (message_part_2 != "JOArduinoLogsBOT")                            // если сообщение не для него, то пропускает его //
+    case 10301:                                // установка температуры (нижняя граница) ALERT //
     {
-      Message_command_executer(message_part_1);
+      object_ds18b20_0.set_crit_temp_low_alert(text);
+      object_ds18b20_3.set_crit_temp_low_alert(text);
+      break;
+    }
+
+    case 10302:                                // установка влажность (нижняя граница) ALERT //
+    {
+      object_Temp_Humidity_sensor.set_humidity_low_alert(text);
+      break;
+    }
+
+    case 10303:                                // установка влажность (верхняя граница) ALERT //
+    {
+      object_Temp_Humidity_sensor.set_humidity_high_alert(text);
+      break;
+    }
+
+    case 10304:                                // установка СО2 (верхняя граница) ALERT //
+    {
+      object_CO2_sensor.set_co2_high_alert(text.toInt());
+      break;
+    }
+
+    case 104:                                  // установка температуры термостата //
+    {
+      float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      TempMain = constrain(buf_text_float, -55, 55);
+      object_array_users[users_array_index].send_message("Термостат установлен на температуру: " + String(TempMain) + "°C");
+      break;      
+    }
+
+    case 105:                                  // установка чувствительности термостата //
+    {
+      float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      TempRange = constrain(buf_text_float, 0.2, 6);
+      object_array_users[users_array_index].send_message("Термостат включится/выключится при отклонение +- " + String(TempRange) + "°C");
+      break;   
+    }
+
+    case 107:                                  // установка максимального уровня СО2 для заслонок //
+    {
+      int buf_text_int = text.toInt();         // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      target_co2 = constrain(buf_text_int, 500, 1000);
+      object_array_users[users_array_index].send_message("Максимальный уровень СО2 в квартире для заслонок (+-20): " + String(target_co2) + "ppm");
+      break;  
+    }
+
+    case 108:                                  // установка шага заслонок //
+    {
+      int calculation_buf2 = 999999;
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      Step_Per_loop = constrain(buf_text_int, 0, 1000);  // Ограничивает диапазон возможных значений //
+      if(Step_Per_loop != 0)
+      {
+        float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
+        calculation_buf2 = int(calculation_buf) * 2;
+      }
+
+      String buf = "Шаг изменения положения заслонок: " + String(Step_Per_loop) +\
+                    "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количества шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
+      object_array_users[users_array_index].send_message(buf);
+      break;  
+    }
+
+    case 109:                                  // ручное управление заслонками //
+    {
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      int buf_steps_amount = constrain(buf_text_int, -10000, 10000);
+      object_array_users[users_array_index].send_message("Принял количество шагов: " + String(buf_steps_amount));
+
+      object_motor_main.doXsteps_func(buf_steps_amount);
+      object_array_users[users_array_index].send_message(object_motor_main.getMotorPositions());
+      break;  
+    }
+
+    case 111:                                  // ручная установка крайнего нижнего положения заслонки с улицы //
+    {
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      street_LOWEST_position_cur = constrain(buf_text_int, street_LOWEST_position_const, 0);
+      if (object_motor_main.get_steps_GLOBAL() < street_LOWEST_position_cur)
+      {
+        object_motor_main.doXsteps_func(street_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
+      }
+      object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки с улицы: " + String(street_LOWEST_position_cur));
+      break;  
+    }
+
+    case 112:                                  // ручная установка крайнего нижнего положения заслонки от батареи //
+    {
+      int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      home_LOWEST_position_cur = constrain(buf_text_int, 0, home_LOWEST_position_const);
+      if (object_motor_main.get_steps_GLOBAL() > home_LOWEST_position_cur)
+      {
+        object_motor_main.doXsteps_func(home_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
+      }
+      object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки от батареи: " + String(home_LOWEST_position_cur));
+      break;  
+    }
+
+    case 113:                                  // Установка желаемой влажности //
+    {
+      float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      room_humidity_target = constrain(buf_text_float, 5, 65);
+      float hum_buf_low = room_humidity_target - room_humidity_range;
+      float hum_buf_high = room_humidity_target + room_humidity_range;
+
+      String buf = "Установлена желаемая влажность: " + String(room_humidity_target) +\
+                    "\n\n*Увлажнитель включится, когда влажность опуститься до: " + String(hum_buf_low) +\
+                    "\nУвлажнитель выключится, когда влажность поднимется до: " +  String(hum_buf_high);
+      object_array_users[users_array_index].send_message(buf);
+      break;  
+    }
+
+    case 114:                                  // Установка чувствительности увлажнителя //
+    {
+      float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+      room_humidity_range = constrain(buf_text_float, 3, 20);
+      float hum_buf_low = room_humidity_target - room_humidity_range;
+      float hum_buf_high = room_humidity_target + room_humidity_range;
+
+      String buf = "Чувствительность увлажнителя установлена: " + String(room_humidity_range) +\
+                    "\n\n*Увлажнитель включится, когда влажность опуститься до: " + String(hum_buf_low) +\
+                    "\nУвлажнитель выключится, когда влажность поднимется до: " + String(hum_buf_high);
+      object_array_users[users_array_index].send_message(buf);
+      break;  
+    }
+
+    case 390:                                  // выбор гостевого чата вручную //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_array_users[1].set_id(text);
+        object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
+        object_array_users[1].send_message("Я проснулся.");
+      }
+
+      else 
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
     }
   }
-  
-  else
-  {
-    send_alert("INTRUDER: " + CHAT_IDcur);
-  }
+  object_array_users[users_array_index].set_message_state(1);
 }
 
-void Message_command_executer(String text)       // обработчик команд //
+void Message_command_send_data(int text_int)      // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  if (text == "/back")                           // отмена ввода //
+  switch (text_int)                            // 1** команды доступные всем, 3** команды требующие доступ администратора //
   {
-    if (object_array_users[users_array_index].get_message_state() == 1)
+    case 101:                                  // текущие температуры в текстовом виде //
     {
-      object_array_users[users_array_index].send_message("Команда для ввода данных не была выбрана. Посмотрите команды в меню.");
+      update_sensors_data_and_calculations();
+      object_array_users[users_array_index].send_message(TEMP_text_output() + "\n\n\n\n↓↓↓ЗАСЛОНКИ↓↓↓" + object_motor_main.getMotorPositions());
+      break;
     }
     
-    else
+    case 102:                                  // текущие температуры в формате excel //
     {
-      object_array_users[users_array_index].set_message_state(1);
-      object_array_users[users_array_index].send_message("Ввод данных отменен.");
+      update_sensors_data_and_calculations(); 
+      object_array_users[users_array_index].send_message(TEMP_excel_output() + "\n\n*Дата и время добавляется LOG ботом, по этому её здесь нет.");
+      break;
     }
-  }
 
-  else if (object_array_users[users_array_index].get_message_state() != 1)               // если MessageState != 1, то значит ожидаем ввод данных //
-  {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    switch (object_array_users[users_array_index].get_message_state())
-    {
-      case 10301:                                // установка температуры (нижняя граница) ALERT //
-      {
-        object_ds18b20_0.set_crit_temp_low_alert(text);
-        object_ds18b20_3.set_crit_temp_low_alert(text);
-        break;
-      }
-
-      case 10302:                                // установка влажность (нижняя граница) ALERT //
-      {
-        object_Temp_Humidity_sensor.set_humidity_low_alert(text);
-        break;
-      }
-
-      case 10303:                                // установка влажность (верхняя граница) ALERT //
-      {
-        object_Temp_Humidity_sensor.set_humidity_high_alert(text);
-        break;
-      }
-
-      case 10304:                                // установка СО2 (верхняя граница) ALERT //
-      {
-        object_CO2_sensor.set_co2_high_alert(text.toInt());
-        break;
-      }
-
-      case 104:                                  // установка температуры термостата //
-      {
-        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        TempMain = constrain(buf_text_float, -55, 55);
-        object_array_users[users_array_index].send_message("Термостат установлен на температуру: " + String(TempMain) + "°C");
-        break;      
-      }
-
-      case 105:                                  // установка чувствительности термостата //
-      {
-        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        TempRange = constrain(buf_text_float, 0.2, 6);
-        object_array_users[users_array_index].send_message("Термостат включится/выключится при отклонение +- " + String(TempRange) + "°C");
-        break;   
-      }
-
-      case 107:                                  // установка максимального уровня СО2 для заслонок //
-      {
-        int buf_text_int = text.toInt();         // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        target_co2 = constrain(buf_text_int, 500, 1000);
-        object_array_users[users_array_index].send_message("Максимальный уровень СО2 в квартире для заслонок (+-20): " + String(target_co2) + "ppm");
-        break;  
-      }
-
-      case 108:                                  // установка шага заслонок //
-      {
-        int calculation_buf2 = 999999;
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        Step_Per_loop = constrain(buf_text_int, 0, 1000);  // Ограничивает диапазон возможных значений //
-        if(Step_Per_loop != 0)
-        {
-          float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
-          calculation_buf2 = int(calculation_buf) * 2;
-        }
-
-        String buf = "Шаг изменения положения заслонок: " + String(Step_Per_loop) +\
-                     "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количества шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
-        object_array_users[users_array_index].send_message(buf);
-        break;  
-      }
-
-      case 109:                                  // ручное управление заслонками //
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        int buf_steps_amount = constrain(buf_text_int, -10000, 10000);
-        object_array_users[users_array_index].send_message("Принял количество шагов: " + String(buf_steps_amount));
-
-        object_motor_main.doXsteps_func(buf_steps_amount);
-        object_array_users[users_array_index].send_message(object_motor_main.getMotorPositions());
-        break;  
-      }
-
-      case 111:                                  // ручная установка крайнего нижнего положения заслонки с улицы //
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        street_LOWEST_position_cur = constrain(buf_text_int, street_LOWEST_position_const, 0);
-        if (object_motor_main.get_steps_GLOBAL() < street_LOWEST_position_cur)
-        {
-          object_motor_main.doXsteps_func(street_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
-        }
-        object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки с улицы: " + String(street_LOWEST_position_cur));
-        break;  
-      }
-
-      case 112:                                  // ручная установка крайнего нижнего положения заслонки от батареи //
-      {
-        int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        home_LOWEST_position_cur = constrain(buf_text_int, 0, home_LOWEST_position_const);
-        if (object_motor_main.get_steps_GLOBAL() > home_LOWEST_position_cur)
-        {
-          object_motor_main.doXsteps_func(home_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
-        }
-        object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки от батареи: " + String(home_LOWEST_position_cur));
-        break;  
-      }
-
-      case 113:                                  // Установка желаемой влажности //
-      {
-        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        room_humidity_target = constrain(buf_text_float, 5, 65);
-        float hum_buf_low = room_humidity_target - room_humidity_range;
-        float hum_buf_high = room_humidity_target + room_humidity_range;
-
-        String buf = "Установлена желаемая влажность: " + String(room_humidity_target) +\
-                     "\n\n*Увлажнитель включится, когда влажность опуститься до: " + String(hum_buf_low) +\
-                     "\nУвлажнитель выключится, когда влажность поднимется до: " +  String(hum_buf_high);
-        object_array_users[users_array_index].send_message(buf);
-        break;  
-      }
-
-      case 114:                                  // Установка чувствительности увлажнителя //
-      {
-        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        room_humidity_range = constrain(buf_text_float, 3, 20);
-        float hum_buf_low = room_humidity_target - room_humidity_range;
-        float hum_buf_high = room_humidity_target + room_humidity_range;
-
-        String buf = "Чувствительность увлажнителя установлена: " + String(room_humidity_range) +\
-                     "\n\n*Увлажнитель включится, когда влажность опуститься до: " + String(hum_buf_low) +\
-                     "\nУвлажнитель выключится, когда влажность поднимется до: " + String(hum_buf_high);
-        object_array_users[users_array_index].send_message(buf);
-        break;  
-      }
-
-      case 390:                                  // выбор гостевого чата вручную //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_array_users[1].set_id(text);
-          object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
-          object_array_users[1].send_message("Я проснулся.");
-        }
-
-        else 
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }        
-        break;  
-      }
+    case 103:                                  // установка оповещений (ALERT) //
+    { 
+      String buf = "Установка оповещений: \n\n Температура нижняя граница (/10301@JOArduinoChatBOT). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
+                    "\n Влажность нижняя граница (/10302@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()) +\
+                    "\n Влажность верхняя граница (/10303@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()) +\
+                    "\n СО2 верхняя граница (/10304@JOArduinoChatBOT). Текущее значение: " + String(object_CO2_sensor.get_co2_high_alert());
+      object_array_users[users_array_index].send_message(buf);
+      break;
     }
-    object_array_users[users_array_index].set_message_state(1);
-  }
 
-  else                                           // если MessageState == 1, то значит ожидаем команду //
-  {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    byte dividerIndex_2 = text.indexOf('/');                     // ищем индекс разделителя "/" //
-    String buf_text = text.substring(dividerIndex_2 + 1);        // оставляем только команду "back" //
-
-    int text_int = buf_text.toInt();
-
-    switch (text_int)                            // 1** команды доступные всем, 3** команды требующие доступ администратора //
+    case 10301:                                // ↑↑↑ // температура // 
     {
-      case 101:                                  // текущие температуры в текстовом виде //
-      {
-        update_sensors_data_and_calculations();
-        object_array_users[users_array_index].send_message(TEMP_text_output() + "\n\n\n\n↓↓↓ЗАСЛОНКИ↓↓↓" + object_motor_main.getMotorPositions());
-        break;
-      }
-      
-      case 102:                                  // текущие температуры в формате excel //
-      {
-        update_sensors_data_and_calculations(); 
-        object_array_users[users_array_index].send_message(TEMP_excel_output() + "\n\n*Дата и время добавляется LOG ботом, по этому её здесь нет.");
-        break;
-      }
+      String buf = "Отправьте сообщение для установки температуры, НИЖЕ которой будут приходить уведомления (ALERT) (от -55 до 55):\n\n   Текущее значение Рекуператор Приток (in): " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
+                    "\n   Текущее значение Рекуператор Вытяжка (out): " + String(object_ds18b20_3.get_crit_temp_low_alert());
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(10301);
+      break;
+    }
 
-      case 103:                                  // установка оповещений (ALERT) //
-      { 
-        String buf = "Установка оповещений: \n\n Температура нижняя граница (/10301@JOArduinoChatBOT). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
-                     "\n Влажность нижняя граница (/10302@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()) +\
-                     "\n Влажность верхняя граница (/10303@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()) +\
-                     "\n СО2 верхняя граница (/10304@JOArduinoChatBOT). Текущее значение: " + String(object_CO2_sensor.get_co2_high_alert());
-        object_array_users[users_array_index].send_message(buf);
-        break;
-      }
+    case 10302:                                // ↑↑↑ // влажность нижняя граница //      
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для установки влажности, НИЖЕ которой будут приходить уведомления (ALERT) (от 0 до 100):\n\nТекущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()));
+      object_array_users[users_array_index].set_message_state(10302);
+      break;            
+    }
 
-      case 10301:                                // ↑↑↑ // температура // 
-      {
-        String buf = "Отправьте сообщение для установки температуры, НИЖЕ которой будут приходить уведомления (ALERT) (от -55 до 55):\n\n   Текущее значение Рекуператор Приток (in): " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
-                     "\n   Текущее значение Рекуператор Вытяжка (out): " + String(object_ds18b20_3.get_crit_temp_low_alert());
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(10301);
-        break;
-      }
+    case 10303:                                // ↑↑↑ // влажность верхняя граница //      
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для установки влажности, ВЫШЕ которой будут приходить уведомления (ALERT) (от 0 до 100):\n\nТекущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()));
+      object_array_users[users_array_index].set_message_state(10303);
+      break;            
+    }
 
-      case 10302:                                // ↑↑↑ // влажность нижняя граница //      
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для установки влажности, НИЖЕ которой будут приходить уведомления (ALERT) (от 0 до 100):\n\nТекущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()));
-        object_array_users[users_array_index].set_message_state(10302);
-        break;            
-      }
+    case 10304:                                // ↑↑↑ // со2 // 
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение для установки СО2, ВЫШЕ котрого будут приходить уведомления (ALERT) (от 0 до 2500):\n\nТекущее значение: " + String(object_CO2_sensor.get_co2_high_alert()));
+      object_array_users[users_array_index].set_message_state(10304);
+      break;            
+    }
 
-      case 10303:                                // ↑↑↑ // влажность верхняя граница //      
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для установки влажности, ВЫШЕ которой будут приходить уведомления (ALERT) (от 0 до 100):\n\nТекущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()));
-        object_array_users[users_array_index].set_message_state(10303);
-        break;            
-      }
+    case 104:                                  // установка температуры термостата //
+    {
+      String buf = "Отправьте сообщение для установки температуры термостата в °C (от -55 до 55):\n\nТекущее значение: " + String(TempMain) +\
+                    "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in).\n\n**Термостат не будет работать пока разница температур на улице и дома не достигнет 8 градусов (Пока этого не произойдет - процент водуха с улицы и от батареи будет равен нулю).";
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(104);
+      break;
+    }
 
-      case 10304:                                // ↑↑↑ // со2 // 
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение для установки СО2, ВЫШЕ котрого будут приходить уведомления (ALERT) (от 0 до 2500):\n\nТекущее значение: " + String(object_CO2_sensor.get_co2_high_alert()));
-        object_array_users[users_array_index].set_message_state(10304);
-        break;            
-      }
+    case 105:                                  // установка чувствительности термостата //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности термостата в °C (от 0.2 до 6):\n\nТекущее значение: " + String(TempRange));
+      object_array_users[users_array_index].set_message_state(105);
+      break;
+    }
 
-      case 104:                                  // установка температуры термостата //
+    case 107:                                  // установка максимального уровня СО2 для заслонок //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение дла установки максимального уровня СО2 в квартире для заслонок +-20 (от 500 до 1000):\n\nТекущее значение: " + String(target_co2) + "ppm");
+      object_array_users[users_array_index].set_message_state(107);
+      break;
+    }
+
+    case 108:                                  // установка шага заслонок //
+    {
+      int calculation_buf2 = 999999;
+
+      if(Step_Per_loop != 0)
       {
-        String buf = "Отправьте сообщение для установки температуры термостата в °C (от -55 до 55):\n\nТекущее значение: " + String(TempMain) +\
-                     "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in).\n\n**Термостат не будет работать пока разница температур на улице и дома не достигнет 8 градусов (Пока этого не произойдет - процент водуха с улицы и от батареи будет равен нулю).";
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(104);
-        break;
+        float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
+        calculation_buf2 = int(calculation_buf) * 2;
       }
 
-      case 105:                                  // установка чувствительности термостата //
+      String buf = "Отправьте сообщение для установки шага изменения положения заслонок (от 0 до 1000):\n\nТекущее значение: " + String(Step_Per_loop) +\
+                    "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количество шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(108);
+      break;
+    }
+
+    case 109:                                  // ручное управление заслонками //
+    {
+      object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + object_motor_main.getMotorPositions());
+      object_array_users[users_array_index].set_message_state(109);
+      break;
+    }
+
+    case 110:                                  // ручная инициализация быстрой калибровки заслонок //
+    {
+      motor_calibration::state = motor_calibration::quick;
+      object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
+      object_motor_main.calibrate_test(false);
+      break;
+    }
+
+    case 310:                                  // ручная инициализация полноценной калибровки заслонок //
+    {
+      object_array_users[users_array_index].send_message("Полноценная калибровка займет несколько минут. \n\n*Полноценная калибровка сбрасывает крайние положения заслонок выставленные вручную.\n\n\nПродолжить? - /31001@JOArduinoChatBOT");
+      break;
+    }
+
+    case 31001:                                // ручная инициализация полноценной калибровки заслонок // подтверждение //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
       {
-        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности термостата в °C (от 0.2 до 6):\n\nТекущее значение: " + String(TempRange));
-        object_array_users[users_array_index].set_message_state(105);
-        break;
-      }
-
-      case 107:                                  // установка максимального уровня СО2 для заслонок //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки максимального уровня СО2 в квартире для заслонок +-20 (от 500 до 1000):\n\nТекущее значение: " + String(target_co2) + "ppm");
-        object_array_users[users_array_index].set_message_state(107);
-        break;
-      }
-
-      case 108:                                  // установка шага заслонок //
-      {
-        int calculation_buf2 = 999999;
-
-        if(Step_Per_loop != 0)
-        {
-          float calculation_buf = (home_LOWEST_position_cur - street_LOWEST_position_cur) / Step_Per_loop;
-          calculation_buf2 = int(calculation_buf) * 2;
-        }
-
-        String buf = "Отправьте сообщение для установки шага изменения положения заслонок (от 0 до 1000):\n\nТекущее значение: " + String(Step_Per_loop) +\
-                     "\n\n*Термостат запускается раз в две минуты и при отклонение от заданной температуры меняет положение заслонок. \n\n*Текущее значение количество шагов значит, что обе заслонки могут поменять своё положение на противоположенное за " + String(calculation_buf2) + " минут(ы).";
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(108);
-        break;
-      }
-
-      case 109:                                  // ручное управление заслонками //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение с количеством шагов от -10000 до 10000:" + object_motor_main.getMotorPositions());
-        object_array_users[users_array_index].set_message_state(109);
-        break;
-      }
-
-      case 110:                                  // ручная инициализация быстрой калибровки заслонок //
-      {
-        motor_calibration::state = motor_calibration::quick;
-        object_array_users[users_array_index].send_message("Принял запрос на быструю калиброку.\n\n*Быстрая калибровка не сбрасывает крайние положения заслонок выставленные вручную.");
+        motor_calibration::state = motor_calibration::full;
+        object_array_users[users_array_index].send_message("Принял запрос на полноценную калибровку.");
         object_motor_main.calibrate_test(false);
-        break;
+      }
+      else
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа для того, чтобы отправить меня в другой чат.");
+      }
+      break;
+    }
+
+    case 111:                                  // ручная установка крайнего нижнего положения заслонки с улицы //
+    {
+      String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки с улицы (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки с улицы после калибровки: " + String(street_LOWEST_position_const) +\
+                    "\nЗначение выставленное вручную: " + String(street_LOWEST_position_cur);
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(111);
+      break;
+    }
+
+    case 112:                                  // ручная установка крайнего нижнего положения заслонки от батареи //
+    {
+      String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки от батареи (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки от батареи после калибровки: " + String(home_LOWEST_position_const) +\
+                    "\nЗначение выставленное вручную: " + String(home_LOWEST_position_cur);
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(112);
+      break;
+    }
+
+    case 113:                                  // Установка желаемой влажности //
+    {
+      String buf = "Отправьте сообщение для установки желаемой влажности(от 5 до 65).\n\nТекущее значение: " + String(room_humidity_target) +\
+                    "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
+                    "\nПоследний месяц работы: " + String(humidity_month_end);
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(113);
+      break;
+    }
+
+    case 114:                                  // Установка чувствительности увлажнителя //
+    {
+      String buf = "Отправьте сообщение для установки чувствительности увлажнителя (от 3 до 20).\n\nТекущее значение: " + String(room_humidity_range) +\
+                    "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
+                    "\nПоследний месяц работы: " + String(humidity_month_end);
+      object_array_users[users_array_index].send_message(buf);
+      object_array_users[users_array_index].set_message_state(114);
+      break;
+    }
+
+    case 190:                                  // ВКЛ/ВЫКЛ Текстовых уведомлений //
+    {
+      object_array_users[users_array_index].set_alert_flag();
+      break;
+    }
+
+    case 350:                                  // установка разрешения ds12b20 на 12bit //
+    {
+      object_array_users[users_array_index].send_message("Эта комана необходима в случае, если настройки датчиков температуры сбились и показывают значения с разрешением 9бит вместо 12бит (разрешение 9бит - 0,5, разрешение 12бит - 0.0625)\n\n\nПродолжить? - /35001@JOArduinoChatBOT");
+      break;
+    }
+
+    case 35001:                                // ↑↑↑ // Подтверждение //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+          object_ds18b20_0.set_res_to_12_bit();
+          object_ds18b20_1.set_res_to_12_bit();
+          object_ds18b20_2.set_res_to_12_bit();
+          object_ds18b20_3.set_res_to_12_bit();
+          object_ds18b20_4.set_res_to_12_bit();
+          object_ds18b20_5.set_res_to_12_bit();
+          object_ds18b20_6.set_res_to_12_bit();
+          object_ds18b20_7.set_res_to_12_bit();
+      }
+      else
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа для выполнения команды.");
+      }
+      break;
+    }
+
+    case 351:                                  // перезапуск датчика со2 //
+    {
+      object_array_users[users_array_index].send_message("Если датчик СО2 перестал отдавать показания или глючит - можно попробовать его перезапустить.\n\n\nПродолжить? - /35101@JOArduinoChatBOT");
+      break;
+    }
+
+    case 35101:                                // ↑↑↑ // Подтверждение //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_CO2_sensor.restart();
       }
 
-      case 310:                                  // ручная инициализация полноценной калибровки заслонок //
+      else
       {
-        object_array_users[users_array_index].send_message("Полноценная калибровка займет несколько минут. \n\n*Полноценная калибровка сбрасывает крайние положения заслонок выставленные вручную.\n\n\nПродолжить? - /31001@JOArduinoChatBOT");
-        break;
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
+    }
+
+    case 352:                                  // рекалибровка со2 //
+    {
+      object_array_users[users_array_index].send_message("Рекалибровка датчика СО2 нужна в случае, если даже при открытых окнах он не показывает значение около 400 и нужно его рекалибровать.\n\nПри рекалибровке необходимо максимально проветрить помещение, чтобы воздух был близок к уличному.\n\n\nПродолжить? - /35201@JOArduinoChatBOT");
+      break;      
+    }
+
+    case 35201:                                // ↑↑↑ // Подтверждение //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_CO2_sensor.recalibration();
       }
 
-      case 31001:                                // ручная инициализация полноценной калибровки заслонок // подтверждение //
+      else
       {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
+    }
+
+    case 353:                                  // сброс на заводские настройки со2 //
+    {
+      object_array_users[users_array_index].send_message("Сброс на заводские настройки сбрасывает все настройки, в том числе параметры калбировки датчика.\n\n\nПродолжить? - /35301@JOArduinoChatBOT");
+      break;      
+    }
+
+    case 35301:                                // ↑↑↑ // Подтверждение //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_CO2_sensor.factory_reset();
+      }
+
+      else
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
+    }
+
+    case 370:                                  // Перезагрузка ESP //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
+      {
+        object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
+        esp_restart_flag = true;
+      }
+
+      else 
+      {
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }
+      break;
+    }
+
+    case 380:                                  // отключить всех остальных пользователей от управления //
+    {
+      if (users_array_index == 0)
+      {
+        shutdown_friends = !shutdown_friends;
+        if(shutdown_friends == true)
         {
-          motor_calibration::state = motor_calibration::full;
-          object_array_users[users_array_index].send_message("Принял запрос на полноценную калибровку.");
-          object_motor_main.calibrate_test(false);
+          object_array_users[users_array_index].send_message("Отключил возможность управления из друх чатов.");
         }
         else
         {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа для того, чтобы отправить меня в другой чат.");
+          object_array_users[users_array_index].send_message("Восстановил возможность управления из других чатов.");
         }
-        break;
       }
 
-      case 111:                                  // ручная установка крайнего нижнего положения заслонки с улицы //
+      else
       {
-        String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки с улицы (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки с улицы после калибровки: " + String(street_LOWEST_position_const) +\
-                     "\nЗначение выставленное вручную: " + String(street_LOWEST_position_cur);
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(111);
-        break;
-      }
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+      }        
+      break;
+    }
 
-      case 112:                                  // ручная установка крайнего нижнего положения заслонки от батареи //
+    case 390:                                  // выбор гостевого чата //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
       {
-        String buf = "Отправьте сообщение для установки крайнего нижнего положения заслонки от батареи (во избежание ошибок его невозможно выставить меньше, чем значение после калибровки).\n\nЗначение крайнего нижнего положения заслонки от батареи после калибровки: " + String(home_LOWEST_position_const) +\
-                     "\nЗначение выставленное вручную: " + String(home_LOWEST_position_cur);
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(112);
-        break;
+        object_array_users[users_array_index].send_message("Отправьте ID группы или профиля, чтобы определить гостевой чат (гостевой чат может быть только 1).");
+        object_array_users[users_array_index].set_message_state(390);
       }
 
-      case 113:                                  // Установка желаемой влажности //
+      else 
       {
-        String buf = "Отправьте сообщение для установки желаемой влажности(от 5 до 65).\n\nТекущее значение: " + String(room_humidity_target) +\
-                     "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
-                     "\nПоследний месяц работы: " + String(humidity_month_end);
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(113);
-        break;
+        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
       }
-
-      case 114:                                  // Установка чувствительности увлажнителя //
-      {
-        String buf = "Отправьте сообщение для установки чувствительности увлажнителя (от 3 до 20).\n\nТекущее значение: " + String(room_humidity_range) +\
-                     "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
-                     "\nПоследний месяц работы: " + String(humidity_month_end);
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(114);
-        break;
-      }
-
-      case 190:                                  // ВКЛ/ВЫКЛ Текстовых уведомлений //
-      {
-        object_array_users[users_array_index].set_alert_flag();
-        break;
-      }
-
-      case 350:                                  // установка разрешения ds12b20 на 12bit //
-      {
-        object_array_users[users_array_index].send_message("Эта комана необходима в случае, если настройки датчиков температуры сбились и показывают значения с разрешением 9бит вместо 12бит (разрешение 9бит - 0,5, разрешение 12бит - 0.0625)\n\n\nПродолжить? - /35001@JOArduinoChatBOT");
-        break;
-      }
-
-      case 35001:                                // ↑↑↑ // Подтверждение //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-            object_ds18b20_0.set_res_to_12_bit();
-            object_ds18b20_1.set_res_to_12_bit();
-            object_ds18b20_2.set_res_to_12_bit();
-            object_ds18b20_3.set_res_to_12_bit();
-            object_ds18b20_4.set_res_to_12_bit();
-            object_ds18b20_5.set_res_to_12_bit();
-            object_ds18b20_6.set_res_to_12_bit();
-            object_ds18b20_7.set_res_to_12_bit();
-        }
-        else
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа для выполнения команды.");
-        }
-        break;
-      }
-
-      case 351:                                  // перезапуск датчика со2 //
-      {
-        object_array_users[users_array_index].send_message("Если датчик СО2 перестал отдавать показания или глючит - можно попробовать его перезапустить.\n\n\nПродолжить? - /35101@JOArduinoChatBOT");
-        break;
-      }
-
-      case 35101:                                // ↑↑↑ // Подтверждение //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_CO2_sensor.restart();
-        }
-
-        else
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
-      }
-
-      case 352:                                  // рекалибровка со2 //
-      {
-        object_array_users[users_array_index].send_message("Рекалибровка датчика СО2 нужна в случае, если даже при открытых окнах он не показывает значение около 400 и нужно его рекалибровать.\n\nПри рекалибровке необходимо максимально проветрить помещение, чтобы воздух был близок к уличному.\n\n\nПродолжить? - /35201@JOArduinoChatBOT");
-        break;      
-      }
-
-      case 35201:                                // ↑↑↑ // Подтверждение //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_CO2_sensor.recalibration();
-        }
-
-        else
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
-      }
-
-      case 353:                                  // сброс на заводские настройки со2 //
-      {
-        object_array_users[users_array_index].send_message("Сброс на заводские настройки сбрасывает все настройки, в том числе параметры калбировки датчика.\n\n\nПродолжить? - /35301@JOArduinoChatBOT");
-        break;      
-      }
-
-      case 35301:                                // ↑↑↑ // Подтверждение //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_CO2_sensor.factory_reset();
-        }
-
-        else
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
-      }
-
-      case 370:                                  // Перезагрузка ESP //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
-          esp_restart_flag = true;
-        }
-
-        else 
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
-      }
-
-      case 380:                                  // отключить всех остальных пользователей от управления //
-      {
-        if (users_array_index == 0)
-        {
-          shutdown_friends = !shutdown_friends;
-          if(shutdown_friends == true)
-          {
-            object_array_users[users_array_index].send_message("Отключил возможность управления из друх чатов.");
-          }
-          else
-          {
-            object_array_users[users_array_index].send_message("Восстановил возможность управления из других чатов.");
-          }
-        }
-
-        else
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }        
-        break;
-      }
-
-      case 390:                                  // выбор гостевого чата //
-      {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          object_array_users[users_array_index].send_message("Отправьте ID группы или профиля, чтобы определить гостевой чат (гостевой чат может быть только 1).");
-          object_array_users[users_array_index].set_message_state(390);
-        }
-
-        else 
-        {
-          object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-        }
-        break;
-      }
+      break;
     }
   }
 }
@@ -1986,16 +1550,25 @@ void update_sensors_data_and_calculations()      // Опрос датчиков 
 
   object_Temp_Humidity_sensor.update();
  
-  ds.requestTemperatures();                              // запрашиваем температуру со всех датчиков ds18b20 сразу, а дальше только получаем данные //
+  ds.requestTemperatures();             // запрашиваем температуру со всех датчиков ds18b20 сразу, а дальше только получаем данные //
 
   object_ds18b20_0.update();            // Рекуператор Приток (in) //
   object_ds18b20_1.update();            // Рекуператор Приток (out) //
   object_ds18b20_2.update();            // Рекуператор Вытяжка (in) //
   object_ds18b20_3.update();            // Рекуператор Вытяжка (out) //
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   object_ds18b20_4.update();            // Воздуховод c Улицы //
-  object_ds18b20_7.update();            // Батарея //
   object_ds18b20_5.update();            // Воздуховод с Батареи //
   object_ds18b20_6.update();            // Объединенный поток //
+  object_ds18b20_7.update();            // Батарея //
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   b62 = object_ds18b20_0.get_temp() - object_ds18b20_4.get_temp();                        // Теплопотери притока (если заслонки от батареи закрыты) //
   b82 = object_ds18b20_0.get_temp() - object_ds18b20_6.get_temp();                        // Теплопотери воздухувода от кровати до рекуператора и нагрев вентилятором //
@@ -2008,7 +1581,7 @@ void update_sensors_data_and_calculations()      // Опрос датчиков 
   calculations_b45(buf_c1);            // Эффективность рекуперации на вытяжку //
   calculations_real_efficiency(buf_c1);// Эффективность рекуперации на приток с учетом теплопотерь //
 
-  calculations_b61_b71();        // Процент воздуха с улицы   и   Процент воздуха с батареи //
+  calculations_b61_b71();              // Процент воздуха с улицы   и   Процент воздуха с батареи //
 }
 
 void calculations_b23(float buf_c1)              // расчет b23 (Эффективность рекуперации на приток) //
@@ -2109,18 +1682,27 @@ void humidifier()                                // увлажнитель //
   {
     if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
     {
-      digitalWrite(relay, HIGH);
+      analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
     }
 
-    if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
+    else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
     {
-      digitalWrite(relay, LOW);
+      analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
     }
+  }
+
+  else
+  {
+    analogWrite(pin_PWM_Humidifier, 0);                              // от 0 до 255 // при старте увлажнитель выключен //
   }
 }
 
 void recuperator_button_check(bool send_message_anyway)
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if(analogRead(recuperator_button) > 975)       // Режим - ЗАСЛОНКИ
   {
     if(use_recuperator == true || send_message_anyway == true)
@@ -2149,6 +1731,10 @@ void recuperator_button_check(bool send_message_anyway)
 
 void close_air_dumpers_fast()                    // Быстрое закрытие заслонок при изменение режима вентиляции на "рекуператор" //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if(use_recuperator == true)
   {
     if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_cur)
