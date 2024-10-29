@@ -85,16 +85,16 @@ https://oshwlab.com/narayanabox/climate-cobtrol
 
 # Фотографии
 
-![Фотография заслонок](images/Air_Dumpers.jpg)
-![Фотография часов](images/Clock.jpg)
-![Фотография ESP2](images/Wiring1.jpg)
-![Фотография ESP2](images/Wiring2.jpg)
-![Фотография ESP2](images/Wiring3.jpg)
+<img src="images/Air_Dumpers.jpg" alt="Фотография заслонок" width="400"/>
+<img src="images/Clock.jpg" alt="Фотография часов" width="400"/>
+<img src="images/Wiring1.jp" alt="Фотография ESP8266-1" width="400"/>
+<img src="images/Wiring2.jp" alt="Фотография ESP8266-2" width="400"/>
+<img src="images/Wiring3.jp" alt="Фотография ESP8266-3" width="400"/>
 
 # Боты
 
-![Скриншот 1](images/Screenshot1.jpg)
-![Скриншот 2](images/Screenshot2.jpg)
-![Скриншот 3](images/Screenshot3.jpg)
-![Скриншот 4](images/Screenshot4.jpg)
-![Скриншот 5](images/Screenshot5.jpg)
+<img src="images/Screenshot1.jpg" alt="Скриншот 1" width="400"/>
+<img src="images/Screenshot2.jpg" alt="Скриншот 2" width="400"/>
+<img src="images/Screenshot3.jpg" alt="Скриншот 3" width="400"/>
+<img src="images/Screenshot4.jpg" alt="Скриншот 4" width="400"/>
+<img src="images/Screenshot5.jpg" alt="Скриншот 5" width="400"/>
