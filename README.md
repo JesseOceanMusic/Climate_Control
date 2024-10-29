@@ -91,7 +91,7 @@ https://oshwlab.com/narayanabox/climate-cobtrol
 <img src="images/Wiring2.jpg" alt="Фотография ESP8266-2" width="400"/>
 <img src="images/Wiring3.jpg" alt="Фотография ESP8266-3" width="400"/>
 
-# Боты
+# Скриншоты
 
 <img src="images/Screenshot1.jpg" alt="Скриншот 1" width="400"/>
 <img src="images/Screenshot2.jpg" alt="Скриншот 2" width="400"/>
