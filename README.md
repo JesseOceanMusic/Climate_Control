@@ -87,9 +87,9 @@ https://oshwlab.com/narayanabox/climate-cobtrol
 
 <img src="images/Air_Dumpers.jpg" alt="Фотография заслонок" width="400"/>
 <img src="images/Clock.jpg" alt="Фотография часов" width="400"/>
-<img src="images/Wiring1.jp" alt="Фотография ESP8266-1" width="400"/>
-<img src="images/Wiring2.jp" alt="Фотография ESP8266-2" width="400"/>
-<img src="images/Wiring3.jp" alt="Фотография ESP8266-3" width="400"/>
+<img src="images/Wiring1.jpg" alt="Фотография ESP8266-1" width="400"/>
+<img src="images/Wiring2.jpg" alt="Фотография ESP8266-2" width="400"/>
+<img src="images/Wiring3.jpg" alt="Фотография ESP8266-3" width="400"/>
 
 # Боты
 
