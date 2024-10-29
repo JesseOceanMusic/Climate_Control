@@ -130,7 +130,7 @@ public:
   String name;
   String userName;
   int longPoll = 0;
-  unsigned int waitForResponse = 400;  // Jesse // поменял с 1500 на 400 //
+  unsigned int waitForResponse = 300;  // Jesse // поменял с 1500 на 300 //
   int _lastError;
   int last_sent_message_id = 0;
   int maxMessageLength = 2000;          // Jesse // поменял с 1500 на 2000 //
