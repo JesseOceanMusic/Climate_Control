@@ -90,3 +90,11 @@ https://oshwlab.com/narayanabox/climate-cobtrol
 ![Фотография ESP2](images/Wiring1.jpg)
 ![Фотография ESP2](images/Wiring2.jpg)
 ![Фотография ESP2](images/Wiring3.jpg)
+
+# Боты
+
+![Скриншот 1](images/Screenshot1.jpg)
+![Скриншот 2](images/Screenshot2.jpg)
+![Скриншот 3](images/Screenshot3.jpg)
+![Скриншот 4](images/Screenshot4.jpg)
+![Скриншот 5](images/Screenshot5.jpg)
