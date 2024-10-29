@@ -4,7 +4,7 @@
 
 #define THIS_IS_CHAT_CODE
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_001\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_002\Common_CODE.cpp"
 
 ///↓↓↓ ОТЛАДКА ↓↓↓///
 
@@ -68,12 +68,9 @@ class class_ds18b20                              // класс датчиков 
       #endif
 
       _temp = ds.getTempC(_array_address);
-    //  _second_temp_request();
+      //  _second_temp_request();
 
-      if (_alert_flag == true)
-      {
-        _check_alerts();
-      }
+      _check_alerts();
       _check_errors();
 
       #ifdef Jesse_yield_enable
@@ -124,10 +121,13 @@ class class_ds18b20                              // класс датчиков 
   
     void _check_alerts()
     {
-      if (_crit_temp_low_alert > _temp)
+      if (_alert_flag == true)
       {
-        send_alert("ALERT: " + _name + String(_temp) + "°C");
-        global_ERROR_flag = true;
+        if (_crit_temp_low_alert > _temp)
+        {
+          send_alert("ALERT: " + _name + String(_temp) + "°C" );
+          global_ERROR_flag = true;
+        }
       }
     }
 
@@ -166,7 +166,6 @@ class_ds18b20 object_ds18b20_7(false, 0x28, 0x8C, 0x6B, 0x39, 0x0, 0x0, 0x0, 0x3
 float TempMain       = 22.80;                    // температура термостата //
 float TempRange      =   0.2;                    // чувствительность термостата //
 int Step_Per_loop    =    40;                    // количество шагов двигателя за цикл запуска термостата //
-uint16_t target_co2  =   700;                    // максимальное значение со2 в квартире //
 
 bool use_recuperator;                            // флаг режима рекуператор/заслонки //
 #define recuperator_button A0                    // пин выключателя режима //
@@ -359,8 +358,10 @@ class class_motor_main
     {
     }
 
-    void doXsteps_func(int steps_amount)
+    void doXsteps_func(int steps_amount, bool do_i_need_to_count_steps)
     {
+      int buf_doXsteps_counter = _doXsteps_counter;
+
       if (_calibrate_ERROR == true)
       {
         global_ERROR_flag = true;
@@ -416,6 +417,11 @@ class class_motor_main
         motor_calibration::state = motor_calibration::full;
         global_ERROR_flag = true;
       }
+
+      if (do_i_need_to_count_steps == false)
+      {
+        _doXsteps_counter = buf_doXsteps_counter;
+      }
     }
 
     void calibrate_test(bool is_it_reboot)            // проверяет нужна ли калибровка и если нужна делает. так же по таймеру, раз в сутки, запускает быструю калибровыку //
@@ -425,7 +431,6 @@ class class_motor_main
       #endif
 
       int buf_steps_GLOBAL = _steps_GLOBAL;                          // сохраняем положение заслонок до калибровки
-      int buf_doXsteps_counter = _doXsteps_counter;                  // сохраняем значение счётчика до калибровки
       int street_motor_position_before_calibration;                  // необходимо на случай, если ESP перезагрузилась и после калибровки нужно вернуть заслонки
       int home_motor_position_before_calibration;                    // ↑↑↑
       
@@ -544,8 +549,7 @@ class class_motor_main
             buf_steps_amount = 0 - _steps_GLOBAL + home_motor_position_before_calibration - street_motor_position_before_calibration;
           }
           
-          doXsteps_func(buf_steps_amount);
-          _doXsteps_counter = buf_doXsteps_counter;
+          doXsteps_func(buf_steps_amount, false);
           motor_calibration::state = motor_calibration::idle;
           object_array_users[0].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
         }
@@ -583,7 +587,7 @@ class class_motor_main
       if (_step_counter_Flag == 1 && object_TimeDate.get_TimeB() > 234500)     // отправка отчета по количеству пройденых шагов за день //
       {
         _step_counter_Flag = 0;
-        object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter));
+        object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки и ручного управления): " + String(_doXsteps_counter));
         _doXsteps_counter = 0;
       }
 
@@ -617,7 +621,7 @@ class class_motor_main
                                         "\nКрайнее нижнее положение заслонки с улицы: "             + String(street_LOWEST_position_cur) +\
                                         "\n\n*Заслонка с улицы закрыта на "                         + String(position_street) +\
                                         "%.\n*Заслонка от батареи закрыта на "                      + String(position_home) +\
-                                        "%.\n\n**Шагов сделано за сегодня (без учета калибровки): " + String(_doXsteps_counter);
+                                        "%.\n\n**Шагов сделано за сегодня (без учета калибровки и ручного управления): " + String(_doXsteps_counter);
 
       return (Message_Motor_Positions);
     }
@@ -737,7 +741,7 @@ class SHT41                                      // класс датчика SH
 
     void _check_errors()                         // Проверка показаний температур и влажности на ошибки //
     {
-      if ((10 > int(_temp)) || (int(_temp) > _crit_temp_high_error))                         // Если датчик SHT41 отключен от питание значение будет 0 //
+      if ((14 > int(_temp)) || (int(_temp) > _crit_temp_high_error))                         // Если датчик SHT41 отключен от питание значение будет 0 //
       {
         send_alert("ERROR Температура в комнате: " + String(_temp) + "°C");
         global_ERROR_flag = true;
@@ -872,7 +876,9 @@ class SCD41                                      // класс датчика С
     {
       if (_CO2 > _co2_high_alert)
       {
-        send_alert("ALERT уровень со2: " + String(_CO2) + "ppm");
+        send_alert("ALERT уровень со2: " + String(_CO2) + "ppm" +\
+                   "\n\nИзменить температуру термостата (если снизить температуру термостата - колчество воздуха с улицы увеличится и со2 снизиться): /104@JOArduinoChatBOT" +\
+                   "\n\nНастройка оповещений: /103@JOArduinoChatBOT");
       }
     }
 
@@ -970,6 +976,16 @@ SCD41 object_CO2_sensor;
 
 void setup()                                     // стандартная функция Ардуино - выполняется один раз в начале //
 {
+  ESP.wdtDisable();                              // отключаем software WDT //
+  ESP.wdtEnable(10000);                          // включаем  software WDT с таймером на 10 секунд //
+    /*
+    https://bigdanzblog.wordpress.com/2019/10/08/watch-dog-timer-wdt-for-esp8266/
+    There is a hardware WDT and a software WDT.
+    The HW WDT is always running and will reset the MCU after about 6 seconds.
+    The SW WDT seems to reset the MCU at 1.5 about seconds.
+    You can enable/disable the SW WDT, but not the HW WDT.
+  */
+
   Serial.begin(9600);                            // запускаем Serial Port и определяем его скорость //
   Serial.setTimeout(200);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
@@ -1113,14 +1129,6 @@ void Message_command_get_data(String text)       // вызывается из Co
       break;   
     }
 
-    case 107:                                  // установка максимального уровня СО2 для заслонок //
-    {
-      int buf_text_int = text.toInt();         // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-      target_co2 = constrain(buf_text_int, 500, 1000);
-      object_array_users[users_array_index].send_message("Максимальный уровень СО2 в квартире для заслонок (+-20): " + String(target_co2) + "ppm");
-      break;  
-    }
-
     case 108:                                  // установка шага заслонок //
     {
       int calculation_buf2 = 999999;
@@ -1144,7 +1152,7 @@ void Message_command_get_data(String text)       // вызывается из Co
       int buf_steps_amount = constrain(buf_text_int, -10000, 10000);
       object_array_users[users_array_index].send_message("Принял количество шагов: " + String(buf_steps_amount));
 
-      object_motor_main.doXsteps_func(buf_steps_amount);
+      object_motor_main.doXsteps_func(buf_steps_amount, false);
       object_array_users[users_array_index].send_message(object_motor_main.getMotorPositions());
       break;  
     }
@@ -1155,7 +1163,7 @@ void Message_command_get_data(String text)       // вызывается из Co
       street_LOWEST_position_cur = constrain(buf_text_int, street_LOWEST_position_const, 0);
       if (object_motor_main.get_steps_GLOBAL() < street_LOWEST_position_cur)
       {
-        object_motor_main.doXsteps_func(street_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
+        object_motor_main.doXsteps_func((street_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL()), false);
       }
       object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки с улицы: " + String(street_LOWEST_position_cur));
       break;  
@@ -1167,7 +1175,7 @@ void Message_command_get_data(String text)       // вызывается из Co
       home_LOWEST_position_cur = constrain(buf_text_int, 0, home_LOWEST_position_const);
       if (object_motor_main.get_steps_GLOBAL() > home_LOWEST_position_cur)
       {
-        object_motor_main.doXsteps_func(home_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL());
+        object_motor_main.doXsteps_func((home_LOWEST_position_cur - object_motor_main.get_steps_GLOBAL()), false);
       }
       object_array_users[users_array_index].send_message("Установлено крайнее положение заслонки от батареи: " + String(home_LOWEST_position_cur));
       break;  
@@ -1244,7 +1252,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 103:                                  // установка оповещений (ALERT) //
     { 
-      String buf = "Установка оповещений: \n\n Температура нижняя граница (/10301@JOArduinoChatBOT). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
+      String buf = "Установка оповещений: \n\n Температура нижняя граница для рекуператора (/10301@JOArduinoChatBOT). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
                     "\n Влажность нижняя граница (/10302@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()) +\
                     "\n Влажность верхняя граница (/10303@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()) +\
                     "\n СО2 верхняя граница (/10304@JOArduinoChatBOT). Текущее значение: " + String(object_CO2_sensor.get_co2_high_alert());
@@ -1284,7 +1292,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 104:                                  // установка температуры термостата //
     {
-      String buf = "Отправьте сообщение для установки температуры термостата в °C (от -55 до 55):\n\nТекущее значение: " + String(TempMain) +\
+      String buf =  "Отправьте сообщение для установки температуры термостата в °C (от -55 до 55):\n\nТекущее значение: " + String(TempMain) +\
                     "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in).\n\n**Термостат не будет работать пока разница температур на улице и дома не достигнет 8 градусов (Пока этого не произойдет - процент водуха с улицы и от батареи будет равен нулю).";
       object_array_users[users_array_index].send_message(buf);
       object_array_users[users_array_index].set_message_state(104);
@@ -1295,13 +1303,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
     {
       object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности термостата в °C (от 0.2 до 6):\n\nТекущее значение: " + String(TempRange));
       object_array_users[users_array_index].set_message_state(105);
-      break;
-    }
-
-    case 107:                                  // установка максимального уровня СО2 для заслонок //
-    {
-      object_array_users[users_array_index].send_message("Отправьте сообщение дла установки максимального уровня СО2 в квартире для заслонок +-20 (от 500 до 1000):\n\nТекущее значение: " + String(target_co2) + "ppm");
-      object_array_users[users_array_index].set_message_state(107);
       break;
     }
 
@@ -1739,7 +1740,7 @@ void close_air_dumpers_fast()                    // Быстрое закрыт�
   {
     if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_cur)
     {
-      object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //          
+      object_motor_main.doXsteps_func(Step_Per_loop, true);                  // положительные значения открываем улицу, закрываем батарею //          
     }
   }
 }
@@ -1752,22 +1753,14 @@ void thermostat()                                // термостат //
 
   if(use_recuperator == false)
   {
-    if (object_ds18b20_0.get_temp() < (TempMain - TempRange))          // Если рекуператор приток (in) меньше ...
+    if (object_ds18b20_0.get_temp() < (TempMain - TempRange))        // Если рекуператор приток (in) меньше ...
     {
-      if(object_CO2_sensor.get_CO2() < (target_co2 - 20))              // Если СО2 меньше, чем...
-      {
-        object_motor_main.doXsteps_func(0 - Step_Per_loop);            // отрицательные значения открываем батарею, закрываем улицу //
-      }
+      object_motor_main.doXsteps_func((0 - Step_Per_loop), true);    // отрицательные значения открываем батарею, закрываем улицу //
     }
 
-    if (object_ds18b20_0.get_temp() > (TempMain + TempRange))          // Если рекуператор приток (in) больше ...
+    else if (object_ds18b20_0.get_temp() > (TempMain + TempRange))   // Если рекуператор приток (in) больше ...
     {             
-      object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
-    }
-
-    else if (object_CO2_sensor.get_CO2() > (target_co2 + 20))          // Если СO2 больше, чем...
-    {             
-      object_motor_main.doXsteps_func(Step_Per_loop);                  // положительные значения открываем улицу, закрываем батарею //
+      object_motor_main.doXsteps_func(Step_Per_loop, true);          // положительные значения открываем улицу, закрываем батарею //
     }
   }
 }

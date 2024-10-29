@@ -4,7 +4,7 @@
 
 #define THIS_IS_LOGGER_CODE
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_001\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_002\Common_CODE.cpp"
 
 ///↓↓↓ ОТЛАДКА ↓↓↓///
 
@@ -302,6 +302,16 @@ bool flag_every_day_timer = false;               // флаг для отправ
 
 void setup()                                     // стандартная функция Ардуино - выполняется один раз в начале //
 {
+  ESP.wdtDisable();                              // отключаем software WDT //
+  ESP.wdtEnable(10000);                          // включаем  software WDT с таймером на 10 секунд //
+    /*
+    https://bigdanzblog.wordpress.com/2019/10/08/watch-dog-timer-wdt-for-esp8266/
+    There is a hardware WDT and a software WDT.
+    The HW WDT is always running and will reset the MCU after about 6 seconds.
+    The SW WDT seems to reset the MCU at 1.5 about seconds.
+    You can enable/disable the SW WDT, but not the HW WDT.
+  */
+
   Serial.begin(9600);                                                     // запускаем Serial Port и определяем его скорость //
   Serial.setTimeout(200);                                                 // таймаут для .readString (ждет заданное значение на чтение Serial) // нет смысла ждать стандартную секунду(1000 милисекунд), поскольку синхронизация происходит асинхронно //
 
@@ -377,7 +387,6 @@ void loop()                                      // основной луп //
     flag_every_minute_timer = false;
   }
 }
-
 
 void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
 {

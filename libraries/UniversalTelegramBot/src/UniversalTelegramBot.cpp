@@ -64,15 +64,14 @@ String UniversalTelegramBot::buildCommand(const String& cmd) {
 
 String UniversalTelegramBot::sendGetToTelegram(const String& command) {
   String body, headers;
-  
   // Connect with api.telegram.org if not already connected
   if (!client->connected())
   {
-    yield();        // Jesse //
     #ifdef TELEGRAM_DEBUG  
         Serial.println(F("[BOT]Connecting to server"));
     #endif
-    if (!client->connect(TELEGRAM_HOST, TELEGRAM_SSL_PORT))
+    yield();        // Jesse //
+    if (!client->connect(TELEGRAM_HOST, TELEGRAM_SSL_PORT))          // Jesse // Основная задержка ~2000millis //
     {
       #ifdef TELEGRAM_DEBUG  
         Serial.println(F("[BOT]Conection error"));
@@ -81,19 +80,24 @@ String UniversalTelegramBot::sendGetToTelegram(const String& command) {
   }
   if (client->connected())
   {
-    yield();        // Jesse //
     #ifdef TELEGRAM_DEBUG  
         Serial.println("sending: " + command);
     #endif  
-
+    yield();        // Jesse //
     client->print(F("GET /"));
+    yield();        // Jesse //
     client->print(command);
+    yield();        // Jesse //
     client->println(F(" HTTP/1.1"));
+    yield();        // Jesse //
     client->println(F("Host:" TELEGRAM_HOST));
+    yield();        // Jesse //
     client->println(F("Accept: application/json"));
+    yield();        // Jesse //
     client->println(F("Cache-Control: no-cache"));
+    yield();        // Jesse //
     client->println();
-
+    yield();        // Jesse //
     readHTTPAnswer(body, headers);
     yield();        // Jesse //
   }
@@ -106,20 +110,33 @@ bool UniversalTelegramBot::readHTTPAnswer(String &body, String &headers) {
   bool finishedHeaders = false;
   bool currentLineIsBlank = true;
   bool responseReceived = false;
+  unsigned int local_waitForResponse = waitForResponse;    // Jesse //
 
-  while (millis() - now < longPoll * 1000 + waitForResponse) {
-    while (client->available()) {
+
+  while (millis() - now < longPoll * 1000 + local_waitForResponse)
+  {
+    while (client->available())
+    {
+      yield();        // Jesse //
       char c = client->read();
       responseReceived = true;
 
-      if (!finishedHeaders) {
-        if (currentLineIsBlank && c == '\n') {
+      if (!finishedHeaders)
+      {
+        local_waitForResponse += 10;                       // Jesse //
+        if (currentLineIsBlank && c == '\n')
+        {
           finishedHeaders = true;
-        } else {
+        }
+        else
+        {
           headers += c;
         }
-      } else {
-        if (ch_count < maxMessageLength) {
+      }
+      else
+      {
+        if (ch_count < maxMessageLength)
+        {
           body += c;
           ch_count++;
         }
@@ -129,7 +146,8 @@ bool UniversalTelegramBot::readHTTPAnswer(String &body, String &headers) {
       else if (c != '\r') currentLineIsBlank = false;
     }
 
-    if (responseReceived) {
+    if (responseReceived)
+    {
       #ifdef TELEGRAM_DEBUG  
         Serial.println();
         Serial.println(body);
@@ -327,6 +345,7 @@ bool UniversalTelegramBot::getMe() {
  * CAUTION: All commands must be lower-case                                      *
  * Returns true, if the command list was updated successfully                    *
  ********************************************************************************/
+
 bool UniversalTelegramBot::setMyCommands(const String& commandArray) {
   DynamicJsonDocument payload(maxMessageLength);
   payload["commands"] = serialized(commandArray);
@@ -356,10 +375,8 @@ bool UniversalTelegramBot::setMyCommands(const String& commandArray) {
  * (Argument to pass: the last+1 message to read)             *
  * Returns the number of new messages           *
  ***************************************************************/
-int UniversalTelegramBot::getUpdates(long offset) {
-
-  yield();        // Jesse //
-  
+int UniversalTelegramBot::getUpdates(long offset)
+{
   #ifdef TELEGRAM_DEBUG  
     Serial.println(F("GET Update Messages"));
   #endif
@@ -369,49 +386,44 @@ int UniversalTelegramBot::getUpdates(long offset) {
   command += F("&limit=");
   command += HANDLE_MESSAGES;
 
-  yield();        // Jesse //
-
   if (longPoll > 0)
   {
     command += F("&timeout=");
     command += String(longPoll);
   }
   String response = sendGetToTelegram(command); // receive reply from telegram.org
+  // Robert:
+    // If deserializeJson happen to endup with an error for instance update to big for
+    // the buffer, then last_message_received will not be updated.
+    // Subsequent calls to getUpdates uses last_message_received + 1 for the offset value.
+    // But as last_message_received was not updated we will allways read the same message.
+    // Here we try to find the update_id and store it to update last_message_received if necessary.
 
-// Robert:
-// If deserializeJson happen to endup with an error for instance update to big for
-// the buffer, then last_message_received will not be updated.
-// Subsequent calls to getUpdates uses last_message_received + 1 for the offset value.
-// But as last_message_received was not updated we will allways read the same message.
-// Here we try to find the update_id and store it to update last_message_received if necessary.
+    char * pt1;
+    char * pt2;
+    long candidate = -1;
 
-  char * pt1;
-  char * pt2;
-  long candidate = -1;
-
-  yield();        // Jesse //
-
-  pt1 = strstr_P( response.c_str(), (const char *) F("update_id"));
-  if ( pt1 != nullptr)
-  {
-    yield();        // Jesse //
-    pt1 = strstr_P( pt1, (const char *) F(":"));
+    pt1 = strstr_P( response.c_str(), (const char *) F("update_id"));
     if ( pt1 != nullptr)
     {
       yield();        // Jesse //
-      pt1++;
-      pt2 = strstr_P( pt1, (const char *) F(","));
-      if ( pt2 != nullptr )
+      pt1 = strstr_P( pt1, (const char *) F(":"));
+      if ( pt1 != nullptr)
       {
         yield();        // Jesse //
-        if ( pt2 - pt1 < 12 ) // for safety
-        {  
-          sscanf( pt1, "%ld", &candidate );
+        pt1++;
+        pt2 = strstr_P( pt1, (const char *) F(","));
+        if ( pt2 != nullptr )
+        {
+          yield();        // Jesse //
+          if ( pt2 - pt1 < 12 ) // for safety
+          {  
+            sscanf( pt1, "%ld", &candidate );
+          }
         }
       }
     }
-  }
-// End Robert
+  // End Robert
   if (response == "")
   {
     yield();        // Jesse //
@@ -762,24 +774,21 @@ String UniversalTelegramBot::sendPhotoByBinary(
   return response;
 }
 
-String UniversalTelegramBot::sendDocumentByBinary(
-const String& chat_id, const String& contentType, int fileSize,
-MoreDataAvailable moreDataAvailableCallback,
-GetNextByte getNextByteCallback, GetNextBuffer getNextBufferCallback, GetNextBufferLen getNextBufferLenCallback, const String& fileName) {
+String UniversalTelegramBot::sendDocumentByBinary( const String& chat_id, const String& contentType, int fileSize, MoreDataAvailable moreDataAvailableCallback, GetNextByte getNextByteCallback, GetNextBuffer getNextBufferCallback, GetNextBufferLen getNextBufferLenCallback, const String& fileName)
+{
+  #ifdef TELEGRAM_DEBUG
+  Serial.println(F("sendDocument: SEND Document"));
+  #endif
 
-#ifdef TELEGRAM_DEBUG
-Serial.println(F("sendDocument: SEND Document"));
-#endif
+  String response = sendMultipartFormDataToTelegram("sendDocument", "document", fileName,
+  contentType, chat_id, fileSize,
+  moreDataAvailableCallback, getNextByteCallback, getNextBufferCallback, getNextBufferLenCallback);
 
-String response = sendMultipartFormDataToTelegram("sendDocument", "document", fileName,
-contentType, chat_id, fileSize,
-moreDataAvailableCallback, getNextByteCallback, getNextBufferCallback, getNextBufferLenCallback);
+  #ifdef TELEGRAM_DEBUG
+  Serial.println(response);
+  #endif
 
-#ifdef TELEGRAM_DEBUG
-Serial.println(response);
-#endif
-
-return response;
+  return response;
 }
 
 String UniversalTelegramBot::sendPhoto(const String& chat_id, const String& photo,

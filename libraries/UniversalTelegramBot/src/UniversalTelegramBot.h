@@ -130,10 +130,10 @@ public:
   String name;
   String userName;
   int longPoll = 0;
-  unsigned int waitForResponse = 1500;
+  unsigned int waitForResponse = 400;  // Jesse // поменял с 1500 на 400 //
   int _lastError;
   int last_sent_message_id = 0;
-  int maxMessageLength = 1500;
+  int maxMessageLength = 2000;          // Jesse // поменял с 1500 на 2000 //
 
 private:
   // JsonObject * parseUpdates(String response);
