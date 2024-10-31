@@ -43,15 +43,17 @@ byte users_array_index;
 bool shutdown_friends = false;
 const byte user_array_length = 7;
 
-String meme_array[7] =
+const String meme_dir = "https://raw.githubusercontent.com/JesseOceanMusic/Climate_Control/refs/heads/main/memes/";
+
+const String meme_array[7] =
 {
-  "https://i.postimg.cc/PqF9zpws/001.jpg",
-  "https://i.postimg.cc/26stMsG0/002.jpg",
-  "https://i.postimg.cc/prKSHs1R/003.jpg",
-  "https://i.postimg.cc/xjmhMdjh/004.jpg",
-  "https://i.postimg.cc/SNT6K6Fh/005.jpg",
-  "https://i.postimg.cc/MGjbNvL8/006.jpg",
-  "https://i.postimg.cc/FRybFwmW/007.jpg",
+  "001.jpg",
+  "002.jpg",
+  "003.jpg",
+  "004.jpg",
+  "005.jpg",
+  "006.jpg",
+  "007.jpg",
 };
 
 class class_users
@@ -136,7 +138,9 @@ class class_users
           //                     min: нижняя граница случайных значений, включительно. (опционально)
           //                          max: верхняя граница случайных значений, не включительно.
 
-        fb::File f("file.txt", fb::File::Type::photo, meme_array[meme_index]);
+        String buf_URL = meme_dir + meme_array[meme_index];
+
+        fb::File f("file.txt", fb::File::Type::photo, buf_URL);
         f.chatID = _id;
         bot_main.sendFile(f);
       }
