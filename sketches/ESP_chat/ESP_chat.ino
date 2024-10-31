@@ -4,13 +4,11 @@
 
 #define THIS_IS_CHAT_CODE
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_002\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_003\Common_CODE.cpp"
 
 ///↓↓↓ ОТЛАДКА ↓↓↓///
 
 
-//#define Jesse_DEBUG_free_heap
-//#define Jesse_DEBUG_loop_millis_measure
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 
@@ -353,7 +351,6 @@ class_motor_plus_knobs object_HOME_motor_plus_knobs  (pin_step_HOME, 0, home_LOW
 class class_motor_main
 {
   public:
-
     class_motor_main()
     {
     }
@@ -761,7 +758,6 @@ SHT41 object_Temp_Humidity_sensor;               // создаем экземп�
 /// ↓↓↓ ДАТЧИК СО2 ↓↓↓ ///
 
 
-#include <Arduino.h>
 #include <SensirionI2CScd4x.h>
 #include <Wire.h>
 
@@ -986,14 +982,16 @@ void setup()                                     // стандартная фу�
     You can enable/disable the SW WDT, but not the HW WDT.
   */
 
-  Serial.begin(9600);                            // запускаем Serial Port и определяем его скорость //
-  Serial.setTimeout(200);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
+  Serial.begin(115200);                          // запускаем Serial Port и определяем его скорость //
+  Serial.setTimeout(100);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
   WiFi.setOutputPower(15.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
   object_TimeDate.set_UTC_time();
   object_TimeDate.update_TimeDate();             // обновляем текущее время //
+
+  setup_telegram_bots();
 
   pinMode(pin_knob_LOW,  INPUT_PULLUP);          // определяем пины // нижние концевики //
   pinMode(pin_knob_HIGH, INPUT_PULLUP);          // ↑↑↑ // верхние концевики //
@@ -1026,20 +1024,7 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  #ifdef Jesse_DEBUG_free_heap
-    if (object_TimeDate.get_UTC() - Jesse_debug_free_heap_timer > 60*5)
-    {
-      object_array_users[2].send_message("ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
-      Jesse_debug_free_heap_timer = object_TimeDate.get_UTC();
-    }
-  #endif
-
-  #ifdef Jesse_DEBUG_loop_millis_measure
-    long buf_timer = millis() - test_timer;
-    object_array_users[2].send_message(String(buf_timer));
-    delay(3000);
-    test_timer = millis();
-  #endif
+  debug();
 
   object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
@@ -1047,35 +1032,24 @@ void loop()                                      // основной луп //
 
   close_air_dumpers_fast();                                                         // меняем быстро положение заслонок, если включили режим рекуперации //
 
-  if (bot_main.getUpdates(bot_main.last_message_received + 1) != 0)                 // если есть новые сообщения обрабатываем одно //
-  {
-    Message_from_Telegram_converter();
-  }
+  delay(10);                                                                        // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
+  bot_main.tick();                                                                  // update telegram - получение сообщения из телеги и их обработка //
 
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)         // таймер каждую нечетную минуту //
   {
-    update_sensors_data_and_calculations();                      
+    update_sensors_data_and_calculations();
     SYNCstart();
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    humidifier();
-    thermostat();
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    restart_check();
-    object_motor_main.calibrate_test(false);                                                  // проверяет нужна ли калибровка //
 
     flag_every_minute_timer = true;
   }
 
   if(object_TimeDate.get_MIN() % 2 == 0 && flag_every_minute_timer == true)         // таймер каждую четную минуту //
   {
+    humidifier();
+    thermostat();
+    restart_check();
+    object_motor_main.calibrate_test(false);                                        // проверяет нужна ли калибровка //
+
     flag_every_minute_timer = false;
   }
 }
@@ -1217,11 +1191,6 @@ void Message_command_get_data(String text)       // вызывается из Co
         object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
         object_array_users[1].send_message("Я проснулся.");
       }
-
-      else 
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-      }
       break;
     }
   }
@@ -1352,10 +1321,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
         object_array_users[users_array_index].send_message("Принял запрос на полноценную калибровку.");
         object_motor_main.calibrate_test(false);
       }
-      else
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа для того, чтобы отправить меня в другой чат.");
-      }
       break;
     }
 
@@ -1379,7 +1344,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 113:                                  // Установка желаемой влажности //
     {
-      String buf = "Отправьте сообщение для установки желаемой влажности(от 5 до 65).\n\nТекущее значение: " + String(room_humidity_target) +\
+      String buf =  "Отправьте сообщение для установки желаемой влажности(от 5 до 65).\n\nТекущее значение: "    + String(room_humidity_target) +\
                     "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
                     "\nПоследний месяц работы: " + String(humidity_month_end);
       object_array_users[users_array_index].send_message(buf);
@@ -1389,8 +1354,8 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 114:                                  // Установка чувствительности увлажнителя //
     {
-      String buf = "Отправьте сообщение для установки чувствительности увлажнителя (от 3 до 20).\n\nТекущее значение: " + String(room_humidity_range) +\
-                    "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
+      String buf =  "Отправьте сообщение для установки чувствительности увлажнителя (от 3 до 20).\n\nТекущее значение: " + String(room_humidity_range)  +\
+                    "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: "         + String(humidity_month_start) +\
                     "\nПоследний месяц работы: " + String(humidity_month_end);
       object_array_users[users_array_index].send_message(buf);
       object_array_users[users_array_index].set_message_state(114);
@@ -1422,10 +1387,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
           object_ds18b20_6.set_res_to_12_bit();
           object_ds18b20_7.set_res_to_12_bit();
       }
-      else
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа для выполнения команды.");
-      }
       break;
     }
 
@@ -1440,11 +1401,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
       if (object_array_users[users_array_index].get_admin_flag() == true)
       {
         object_CO2_sensor.restart();
-      }
-
-      else
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
       }
       break;
     }
@@ -1462,10 +1418,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
         object_CO2_sensor.recalibration();
       }
 
-      else
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-      }
       break;
     }
 
@@ -1481,11 +1433,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
       {
         object_CO2_sensor.factory_reset();
       }
-
-      else
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-      }
       break;
     }
 
@@ -1495,11 +1442,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
       {
         object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
         esp_restart_flag = true;
-      }
-
-      else 
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
       }
       break;
     }
@@ -1533,10 +1475,24 @@ void Message_command_send_data(int text_int)      // вызывается из C
         object_array_users[users_array_index].send_message("Отправьте ID группы или профиля, чтобы определить гостевой чат (гостевой чат может быть только 1).");
         object_array_users[users_array_index].set_message_state(390);
       }
+      break;
+    }
 
-      else 
+    case 666:                                  // debug enable/disable //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
       {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        debug_flag = !debug_flag;
+        loop_time_in_millis_is_it_first = true;
+
+        if(debug_flag == true)
+        {
+          object_array_users[users_array_index].send_message("Отправка дебаг-сообщений включена.");
+        }
+        else
+        {
+          object_array_users[users_array_index].send_message("Отправка дебаг-сообщений отключена.");
+        }
       }
       break;
     }
@@ -1708,8 +1664,8 @@ void recuperator_button_check(bool send_message_anyway)
   {
     if(use_recuperator == true || send_message_anyway == true)
     {
-      String recuperator_info_message_2 = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
-      recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
+      String recuperator_info_message_2  = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
+             recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
 
       use_recuperator = false;
       send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);      
@@ -1720,9 +1676,9 @@ void recuperator_button_check(bool send_message_anyway)
   {
     if(use_recuperator == false || send_message_anyway == true)
     {
-    String recuperator_info_message = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха,";
-    recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.";
-    recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
+    String recuperator_info_message  = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха,";
+           recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.";
+           recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
 
     use_recuperator = true;
     send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
@@ -1778,14 +1734,14 @@ void SYNCstart()                                 // Отправка темпе�
   Serial.print(global_ERROR_flag);
 
   global_ERROR_flag = false;
-
-  String SYNCmessage = Serial.readString();
-
-  if (SYNCmessage.length() > 2)                  // Проверка что вообще что-то пришло //
+  
+  if (Serial.available())                  // Проверка что вообще что-то пришло //
   {
     #ifdef Jesse_yield_enable
       yield();
     #endif
+
+    String SYNCmessage = Serial.readString();
 
     unsigned long SYNCtime = SYNCmessage.toInt();
     unsigned long UTC_timeLong = object_TimeDate.get_UTC();

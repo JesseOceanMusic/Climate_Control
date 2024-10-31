@@ -3,15 +3,23 @@
 //NodeMCU 1.0 (ESP-12E Module)
 
 #define THIS_IS_LOGGER_CODE
-
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_002\Common_CODE.cpp"
-
-///↓↓↓ ОТЛАДКА ↓↓↓///
-
-
-//#define Jesse_DEBUG_free_heap
-//#define Jesse_DEBUG_loop_millis_measure
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
+
+
+///↓↓↓ SD КАРТА ↓↓↓///                           // должно быть выше FastBot.h(внутри Common_CODE.cpp)//
+
+
+#include <SPI.h>                                 // библиотека для SD карты //   
+#include <SD.h>                                  // ↑↑↑ //  
+
+String SYNCdata;                                 // стринг для полученных данных из Serial Port //
+bool flag_every_day_timer = false;               // флаг для отправки лога раз в сутки //
+
+
+///↓↓↓ COMMON_CODE ↓↓↓///
+
+
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_003\Common_CODE.cpp"
 
 
 ///↓↓↓ НОЧНОЙ РЕЖИМ ↓↓↓///
@@ -275,27 +283,6 @@ bool clock_night_indication_temperature = true;  // ↑↑↑ // темпера�
 bool clock_night_indication_humidity = true;     // ↑↑↑ // влажность //
 
 
-///↓↓↓ SD КАРТА ↓↓↓///
-
-
-#include <SPI.h>                                 // библиотека для SD карты //   
-#include <SD.h>                                  // ↑↑↑ //  
-
-File myFile;                                     // ипользуется и для отправки файла в телеграм и для работы с SD картой //
-
-bool isMoreDataAvailable()                       // ↑↑↑ // функция для отправки файла в телеграм с сд карты //   
-{
-  return myFile.available();
-}
-
-byte getNextByte()                               // ↑↑↑ // 
-{
-  return myFile.read();
-}
-
-String SYNCdata;                                 // стринг для полученных данных из Serial Port //
-bool flag_every_day_timer = false;               // флаг для отправки лога раз в сутки //
-
 
 ///   ///   ///   ///   ///   ///   ///
 
@@ -312,13 +299,16 @@ void setup()                                     // стандартная фу�
     You can enable/disable the SW WDT, but not the HW WDT.
   */
 
-  Serial.begin(9600);                                                     // запускаем Serial Port и определяем его скорость //
-  Serial.setTimeout(200);                                                 // таймаут для .readString (ждет заданное значение на чтение Serial) // нет смысла ждать стандартную секунду(1000 милисекунд), поскольку синхронизация происходит асинхронно //
+  Serial.begin(115200);                          // запускаем Serial Port и определяем его скорость //
+  Serial.setTimeout(100);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
   WiFi.setOutputPower(15.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
-  object_TimeDate.set_UTC_time();                                         // устанавливаем связь с сервером реального времени и получаем актуальное время //
+  object_TimeDate.set_UTC_time();
+  object_TimeDate.update_TimeDate();             // обновляем текущее время //
+
+  setup_telegram_bots();
 
   FastLED.addLeds<WS2812, DATA_PIN1, GRB>(array_LED_sconce, NUM_LEDS1);   // определяем лед ленту БРА //
   FastLED.addLeds<WS2812, DATA_PIN2, GRB>(array_LED_line, NUM_LEDS2);     // определяем лед ленту ЛИНИИ //
@@ -331,32 +321,14 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  #ifdef Jesse_DEBUG_free_heap
-    if (object_TimeDate.get_UTC() - Jesse_debug_free_heap_timer > 60*5)
-    {
-      object_array_users[2].send_message("ESP.getFreeHeap(): " + String(ESP.getFreeHeap()));
-      Jesse_debug_free_heap_timer = object_TimeDate.get_UTC();
-    }
-  #endif
-
-  #ifdef Jesse_DEBUG_loop_millis_measure
-    long buf_timer = millis() - test_timer;
-    object_array_users[2].send_message(String(buf_timer));
-    delay(3000);
-    test_timer = millis();
-  #endif
+  debug();
 
   object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
+  
   object_NightTime.update_NightTime();                                         // обновляем состояние ночного режима //
 
-
-  if (bot_main.getUpdates(bot_main.last_message_received + 1) != 0)                    // если есть новые сообщения обрабатываем одно //
-  {
-    LEDhello();                                                                // включаем три светодиода для индикации начала обработки входящего сообщения //
-    Message_from_Telegram_converter();
-    LEDbye();                                                                  // выключем три светодиода для индикации начала обработки входящего сообщения //
-  }
-
+  delay(10);                                                                   // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
+  bot_main.tick();                                                             // update telegram - получение сообщения из телеги и их обработка //
 
   if (global_ERROR_flag == true)                                               // проверят были ли ошибки и если были - делает анимацию //
   {
@@ -459,11 +431,6 @@ void Message_command_get_data(String text)       // вызывается из Co
         object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
         object_array_users[1].send_message("Я проснулся.");
       }
-
-      else 
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
-      }
       break;
     }
   }
@@ -499,7 +466,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
       object_NightTime.set_NightTimeDimState(NightTime::DimState::OFF);                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
       FillSolidMY();
       clock_master();
-      object_array_users[users_array_index].send_message("Ночной режим принудительно ВЫКЛЮЧЕН до вечера (Ночью в любом случае не будет появляться анимация ошибки).");
+      object_array_users[users_array_index].send_message("Ночной режим принудительно ОТКЛЮЧЁН до вечера (Ночью в любом случае не будет появляться анимация ошибки).");
       break;
     }
 
@@ -685,7 +652,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
       break;
     }
 
-    case 190:                              // ВКЛ/ВЫКЛ Текстовых уведомлений //
+    case 190:                                                       // ВКЛ/ВЫКЛ Текстовых уведомлений //
     {
       object_array_users[users_array_index].set_alert_flag();
       break;
@@ -697,11 +664,6 @@ void Message_command_send_data(int text_int)      // вызывается из C
       {
         object_array_users[users_array_index].send_message("Поднял флаг для перезагрузки. Сработает через ~2 минуты.");
         esp_restart_flag = true;
-      }
-
-      else 
-      {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
       }
       break;
     }
@@ -728,17 +690,31 @@ void Message_command_send_data(int text_int)      // вызывается из C
       break;
     }
 
-    case 390:                              // выбор гостевого чата кнопки //
+    case 390:                                                       // выбор гостевого чата кнопки //
     {
       if (object_array_users[users_array_index].get_admin_flag() == true)
       {
         object_array_users[users_array_index].send_message("Отправьте ID группы или профиля, чтобы я отправился туда. Я продолжу отвечать на ваши запросы!");
         object_array_users[users_array_index].set_message_state(390);
       }
+      break;
+    }
 
-      else 
+    case 666:                                                       // debug enable/disable //
+    {
+      if (object_array_users[users_array_index].get_admin_flag() == true)
       {
-        object_array_users[users_array_index].send_message("Недостаточно прав доступа.");
+        debug_flag = !debug_flag;
+        loop_time_in_millis_is_it_first = true;
+
+        if(debug_flag == true)
+        {
+          object_array_users[users_array_index].send_message("Отправка дебаг-сообщений включена.");
+        }
+        else
+        {
+          object_array_users[users_array_index].send_message("Отправка дебаг-сообщений отключена.");
+        }
       }
       break;
     }
@@ -796,31 +772,25 @@ void SYNCstart()                                 // получение темп�
 
 void LOGtimer()                                  // отправка лога в 23:45 //
 {
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
   if (flag_every_day_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
   {
     if (!SD.begin(4))
     {
-      send_alert("ERROR: SD card initialization FAILED");
+      send_alert("ERROR: Ошибка инициализации SD карты");
     }
 
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-
-    myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt");
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
+    String file_name = object_TimeDate.get_DateFULL() + ".txt";
+    String buf_user_ID = object_array_users[0].get_id();
+    File myFile = SD.open(file_name);
 
     if (myFile)
     {
-      int size = myFile.size();
-      String response = bot_second.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[0].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
+      fb::File f(file_name, fb::File::Type::document, myFile);
+      f.chatID = buf_user_ID;
+
+      bot_second.sendFile(f, false);
+
+      myFile.close();
     }
 
     else
@@ -830,18 +800,11 @@ void LOGtimer()                                  // отправка лога в
     flag_every_day_timer = true;
   }
 
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
 
   if (flag_every_day_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы лог отправился на следующий день // 
   {    
     flag_every_day_timer = false;
   }
-
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif  
 }
 
 void LOGwrite()                                  // запись в лог //
@@ -852,14 +815,14 @@ void LOGwrite()                                  // запись в лог //
 
   if (!SD.begin(4))
   {
-    send_alert("ERROR: SD card initialization FAILED");
+    send_alert("ERROR: Ошибка инициализации SD карты");
   }
 
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt", FILE_WRITE);
+  File myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt", FILE_WRITE);
 
   #ifdef Jesse_yield_enable
     yield();
@@ -867,13 +830,13 @@ void LOGwrite()                                  // запись в лог //
 
   if (myFile)
   {
-  myFile.println(object_TimeDate.get_DateTimeFULL() + "," + SYNCdata);
-  myFile.close();
+    myFile.println(object_TimeDate.get_DateTimeFULL() + "," + SYNCdata);
+    myFile.close();
   }
 
   else
   {
-    send_alert("ERROR: Create or open .txt FAILED");
+    send_alert("ERROR: Ошибка записи на SD карту");
   }
 
   #ifdef Jesse_yield_enable
@@ -881,36 +844,34 @@ void LOGwrite()                                  // запись в лог //
   #endif
 }
 
-void LOGread()                                   // чтение лога //
+void LOGread()                                   // отправка лога по команде //
 {
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
   if (!SD.begin(4))
   {
-    send_alert("ERROR: SD card initialization FAILED");
+    send_alert("ERROR: Ошибка инициализации SD карты");
   }
-
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt");
-
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
+  
+  String file_name = object_TimeDate.get_DateFULL() + ".txt";
+  String buf_user_ID = object_array_users[users_array_index].get_id();
+  File myFile = SD.open(file_name);
 
   if (myFile)
   {
-    int size = myFile.size();
-    String response=bot_main.sendMultipartFormDataToTelegram("sendDocument", "document", object_TimeDate.get_DateFULL() + ".txt", "", object_array_users[users_array_index].get_id(), size, isMoreDataAvailable, getNextByte, nullptr, nullptr);
+    fb::File f(file_name, fb::File::Type::document, myFile);
+    f.chatID = buf_user_ID;
+
+    bot_main.sendMessage(fb::Message("Ожидайте...\nОтправляю файл: " + file_name, object_array_users[users_array_index].get_id()));
+    delay(20);
+    bot_main.sendFile(f, false);
+    delay(20);
+    bot_main.sendMessage(fb::Message("Отправка файла завершена.", object_array_users[users_array_index].get_id())); 
+
+    myFile.close();
   }
 
   else
   {
-    send_alert("ERROR: Create or open .txt FAILED");
+    send_alert("ERROR: Ошибка чтения SD карты");
   }
 }
 

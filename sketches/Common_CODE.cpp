@@ -1,19 +1,7 @@
-#ifdef Jesse_DEBUG_free_heap
-  time_t Jesse_debug_free_heap_timer;
-#endif
-
-#ifdef Jesse_DEBUG_loop_millis_measure
-  long test_timer;
-#endif
-
 /// ↓↓↓ ТЕЛЕГРАМ ↓↓↓ ///
 
 
-#include <ESP8266WiFi.h>                         // Telegram библиотеки //
-#include <WiFiClientSecure.h>                    // ↑↑↑ //
-#include <UniversalTelegramBot.h>                // ↑↑↑ //
-#include <ArduinoJson.h>                         // ↑↑↑ //
-
+#include <FastBot2.h>
 #include "Sensetive_INFO.cpp"                    // логины/пароли/токены/id //
 /*
   WIFI_SSID
@@ -31,18 +19,22 @@
   USER_ID6
 */
 
-X509List cert(TELEGRAM_CERTIFICATE_ROOT);                                      // какой-то сертификат //
-WiFiClientSecure secured_client;                                               // какой-то secured client //
 
 #ifdef THIS_IS_CHAT_CODE
-  UniversalTelegramBot bot_main(BOT_TOKEN1, secured_client);                   // BOT "Chat" //
-  UniversalTelegramBot bot_second(BOT_TOKEN3, secured_client);                 // BOT "Calibrate" //
+  FastBot2 bot_main;                             // BOT "Chat" //
+  #define bot_main_Token   BOT_TOKEN1
+  FastBot2 bot_second;                           // BOT "Calibrate" //
+  #define bot_second_Token BOT_TOKEN3
+
   const String Opposite_bot_name = "JOArduinoLogsBOT";
 #endif
 
 #ifdef THIS_IS_LOGGER_CODE
-  UniversalTelegramBot bot_main(BOT_TOKEN2, secured_client);                   // BOT "Logs + LED" //
-  UniversalTelegramBot bot_second(BOT_TOKEN4, secured_client);                 // BOT "Backup" //
+  FastBot2 bot_main;                             // BOT "Logs + LED" //
+  #define bot_main_Token BOT_TOKEN2
+  FastBot2 bot_second;                           // BOT "Backup" //
+  #define bot_second_Token BOT_TOKEN4
+
   const String Opposite_bot_name = "JOArduinoChatBOT";
 #endif
 
@@ -50,6 +42,17 @@ bool message_intruder_flag = true;
 byte users_array_index;
 bool shutdown_friends = false;
 const byte user_array_length = 7;
+
+String meme_array[7] =
+{
+  "https://i.postimg.cc/PqF9zpws/001.jpg",
+  "https://i.postimg.cc/26stMsG0/002.jpg",
+  "https://i.postimg.cc/prKSHs1R/003.jpg",
+  "https://i.postimg.cc/xjmhMdjh/004.jpg",
+  "https://i.postimg.cc/SNT6K6Fh/005.jpg",
+  "https://i.postimg.cc/MGjbNvL8/006.jpg",
+  "https://i.postimg.cc/FRybFwmW/007.jpg",
+};
 
 class class_users
 {
@@ -65,9 +68,9 @@ class class_users
       _MessageState = 1;
     }
 
-    bool check_id(String CHAT_IDcur);            // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
+    bool check_id(String CHAT_IDcur, String income_message);         // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
 
-    void send_message(String input);             // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
+    void send_message(String input);                                 // прототип метода, сам метод описан ниже. Необходимо, поскольку метод обращается к объекту, который еще не создан. //
 
     void send_message_second_chat(String input)
     {
@@ -75,7 +78,7 @@ class class_users
         yield();
       #endif
 
-      bot_second.sendMessage(_id, input, "");
+      bot_second.sendMessage(fb::Message(input, _id));
     }
 
     void send_alert(String input)
@@ -86,7 +89,7 @@ class class_users
 
       if (_alert_flag == true)
       {
-        bot_main.sendMessage(_id, input, "");
+        bot_main.sendMessage(fb::Message(input, _id));
       }
     }
 
@@ -105,11 +108,11 @@ class class_users
       _alert_flag = !_alert_flag;
       if(_alert_flag == true)
       {
-        bot_main.sendMessage(_id, "Текстовые уведомления ВКЛЮЧЕНЫ.", "");
+        bot_main.sendMessage(fb::Message("Текстовые уведомления ВКЛЮЧЕНЫ.", _id));
       }
       else
       {
-        bot_main.sendMessage(_id, "Текстовые уведомления ОТКЛЮЧЕНЫ.", "");
+        bot_main.sendMessage(fb::Message("Текстовые уведомления ОТКЛЮЧЕНЫ.", _id));
       }
     }
 
@@ -125,9 +128,21 @@ class class_users
 
     bool get_admin_flag()
     {
+      if(_admin_flag == false) 
+      {
+        this->send_message("Недостаточно прав доступа.");  // this-> обращение к вызванному объекту(экземпляру класса) //
+        
+        byte meme_index = random(0,   7);
+          //                     min: нижняя граница случайных значений, включительно. (опционально)
+          //                          max: верхняя граница случайных значений, не включительно.
+
+        fb::File f("file.txt", fb::File::Type::photo, meme_array[meme_index]);
+        f.chatID = _id;
+        bot_main.sendFile(f);
+      }
       return(_admin_flag);
     }
-
+    
   private:
     byte _users_array_index;                               // индекс пользователя (объекта) в массиве //
     String _id;                                            // ID пользователя //
@@ -155,14 +170,18 @@ void class_users::send_message(String input)
     yield();
   #endif
 
-  bot_main.sendMessage(_id, input, "");
+  bot_main.sendMessage(fb::Message(input, _id));
   if(_need_supervision == true)
   {
-    object_array_users[0].send_message(String("Ответил, ") + _name + ":\n\n" + input);
+    String echo_supervision = "Ответил, ";
+    echo_supervision += _name;
+    echo_supervision += ":\n\n";
+    echo_supervision += input;
+    object_array_users[0].send_message(echo_supervision);
   }
 }
 
-bool class_users::check_id(String CHAT_IDcur)
+bool class_users::check_id(String CHAT_IDcur, String income_message)
 {
   #ifdef Jesse_yield_enable
     yield();
@@ -174,7 +193,7 @@ bool class_users::check_id(String CHAT_IDcur)
    
     if(_need_supervision == true)
     {
-      object_array_users[0].send_message(_name + ", написал:\n\n" + bot_main.messages[0].text);
+      object_array_users[0].send_message(_name + ", написал:\n\n" + income_message);
     }
 
     return(true);
@@ -191,15 +210,13 @@ void send_alert(String input_message)            // функция для отп
   }
 }
 
-bool Message_is_it_known_user()                // Проверка входящего сообщения от пользователя на права доступа //
+bool Message_is_it_known_user(String CHAT_IDcur, String income_message)                  // Проверка входящего сообщения от пользователя на права доступа //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  String CHAT_IDcur = bot_main.messages[0].chat_id;
-
-  if(object_array_users[0].check_id(CHAT_IDcur) == true)        // вначале проверяем мой айди //
+  if(object_array_users[0].check_id(CHAT_IDcur, income_message) == true)        // вначале проверяем мой айди //
   {
     return(true);
   }
@@ -208,7 +225,7 @@ bool Message_is_it_known_user()                // Проверка входящ�
   {
     for(int i = 1; i < user_array_length; i++)
     {
-      if(object_array_users[i].check_id(CHAT_IDcur) == true)
+      if(object_array_users[i].check_id(CHAT_IDcur, income_message) == true)
       {
         return(true);
       }
@@ -221,7 +238,7 @@ bool Message_is_it_known_user()                // Проверка входящ�
 
 void Message_command_get_data(String text);      // прототип функции //
 
-void Message_command_send_data(int text_int);     // прототип функции //
+void Message_command_send_data(int text_int);    // прототип функции //
 
 bool Message_is_it_back_command(String text)     // проверяет является ли текст пришедший из телеграма "/back" //
 {
@@ -247,16 +264,17 @@ bool Message_is_it_back_command(String text)     // проверяет явля�
   return(false);
 }
 
-void Message_from_Telegram_converter()           // преобразование сообщение из Телеграм в команду //
+void Message_from_Telegram_converter(fb::Update& u)           // преобразование сообщение из Телеграм в команду //
 {
   #ifdef Jesse_yield_enable
     yield();
   #endif
 
-  if (Message_is_it_known_user() == true)
-  {
-    String income_message = bot_main.messages[0].text;
+  String CHAT_IDcur = u.message().chat().id();
+  String income_message = u.message().text().toString();
 
+  if (Message_is_it_known_user(CHAT_IDcur, income_message))
+  {
     byte dividerIndex_1 = income_message.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
     String message_part_2 = income_message.substring(dividerIndex_1 + 1);           // записывает в message_part_2 "JOArduinoChatBOT" //
     String message_part_1 = income_message.substring(0, dividerIndex_1);            // записывает в message_part_1 "/back" //
@@ -281,6 +299,24 @@ void Message_from_Telegram_converter()           // преобразование
       }
     }
   }
+}
+
+void setup_telegram_bots()
+{
+  bot_main.setToken(F(bot_main_Token));                    // установить токен
+  bot_second.setToken(F(bot_second_Token));                // установить токен
+
+  bot_main.attachUpdate(Message_from_Telegram_converter);  // подключить обработчик обновлений
+  bot_main.setPollMode(fb::Poll::Long, 20000);
+                               //Sync   синхронный               (рекомендуемый период > 3500 мс)
+                               //Async  асинхронный              (рекомендуемый период > 3500 мс)
+                               //Long   асинхронный long polling (рекомендуемый период > 20000 мс) // Самый быстрый... //
+  
+  bot_main.setMemLimit(4000);                              // установить лимит памяти на ответ сервера (библиотека начнёт пропускать сообщения), умолч. 20.000
+  bot_main.setLimit(1);                                    // установить лимит - кол-во сообщений в одном обновлении (умолч. 3)
+
+  bot_main.setTimeout(400);                                // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
+  bot_second.setTimeout(400);                              // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
 }
 
 
@@ -351,8 +387,6 @@ class class_TimeDate                             // класс Даты и Вр�
     void set_UTC_time()
     {
       configTime(10800, 0, "pool.ntp.org");            // get UTC time via NTP // не работает - "time.nist.gov" //
-      secured_client.setTrustAnchors(&cert);                                  // Add root certificate for api.telegram.org //
-
 
       while (1717656000 > _UTC_time || _UTC_time > 4102444800)                  // не начинаем основной луп, пока не получим время //
       {
@@ -438,7 +472,7 @@ bool flag_every_minute_timer = false;            // флаг для таймер
 
 bool esp_restart_flag = false;
 
-void restart_check()
+void restart_check()                             // реализация перезагрузки из команды в телеграме //
 {
   #ifdef Jesse_yield_enable
     yield();
@@ -469,4 +503,74 @@ void send_reset_info()                           // отчёт о причине
   buf_message += "\nДополнительная информация: ";
   buf_message += Jesse_reset_info;
   send_alert(buf_message);
+}
+
+///↓↓↓ Debug ↓↓↓///
+
+bool debug_flag = false;
+time_t send_report_timer;
+
+unsigned long loop_time_in_millis_counter;
+
+unsigned int loop_time_in_millis_sum_for_avg;
+unsigned int loop_counter_for_avg;
+
+unsigned int loop_time_in_millis_min;
+unsigned int loop_time_in_millis_max;
+
+bool loop_time_in_millis_is_it_first;
+
+void debug()
+{
+  if(debug_flag == true)
+  {
+    if(loop_time_in_millis_is_it_first == true)
+    {
+      loop_time_in_millis_counter = millis();
+      loop_time_in_millis_is_it_first = false;
+      loop_time_in_millis_min = 999999;
+      loop_time_in_millis_max = 0;
+
+      loop_time_in_millis_sum_for_avg = 0;
+      loop_counter_for_avg = 0;
+    }
+
+    else
+    {
+      unsigned long buf_timer = millis() - loop_time_in_millis_counter;
+      loop_time_in_millis_counter = millis();
+
+      if(loop_time_in_millis_min > buf_timer)
+      {
+        loop_time_in_millis_min = buf_timer;
+      }
+
+      if(loop_time_in_millis_max < buf_timer)
+      {
+        loop_time_in_millis_max = buf_timer;
+      }
+      
+      loop_time_in_millis_sum_for_avg += buf_timer;
+      loop_counter_for_avg++;
+
+      if (object_TimeDate.get_UTC() - send_report_timer > 9 && loop_counter_for_avg != 0)           // на всякий случай исключить деление на 0 //
+      {
+
+        unsigned int loop_time_in_millis_avg = loop_time_in_millis_sum_for_avg / loop_counter_for_avg;
+
+        String buf_message  = "Время лупа без учета отправки этого сообщения:\n";
+              buf_message +=  "min: "               + String(loop_time_in_millis_min) + " миллисекунд.\n" +\
+                              "avg: "               + String(loop_time_in_millis_avg) + " миллисекунд.\n" +\
+                              "max: "               + String(loop_time_in_millis_max) + " миллисекунд.\n" +\
+                              "Количество циклов: "   + String(loop_counter_for_avg)    + "\n\n"            +\
+                              "ESP.getFreeHeap(): " + String(ESP.getFreeHeap())       + " байт.";
+
+        object_array_users[2].send_message(buf_message);
+
+        loop_time_in_millis_is_it_first = true;
+
+        send_report_timer = object_TimeDate.get_UTC();
+      }
+    }
+  }
 }
