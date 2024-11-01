@@ -291,7 +291,7 @@ void setup()                                     // стандартная фу�
 {
   ESP.wdtDisable();                              // отключаем software WDT //
   delay(50);
-  ESP.wdtEnable(10000);                          // включаем  software WDT с таймером на 10 секунд //
+  ESP.wdtEnable(8000);                          // включаем  software WDT с таймером на 10 секунд //
     /*
     https://bigdanzblog.wordpress.com/2019/10/08/watch-dog-timer-wdt-for-esp8266/
     There is a hardware WDT and a software WDT.

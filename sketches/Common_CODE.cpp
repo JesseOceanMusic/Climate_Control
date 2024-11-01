@@ -140,7 +140,7 @@ class class_users
 
         String buf_URL = memes_dir + memes_array[meme_index];
 
-        String meme_name = "meme" + memes_array[meme_index];
+        String meme_name = "This_Is_Jesse_O_Meme_" + memes_array[meme_index];
         fb::File f(meme_name, fb::File::Type::photo, buf_URL);
         f.chatID = _id;
         bot_main.sendFile(f);
