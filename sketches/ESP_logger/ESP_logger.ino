@@ -19,7 +19,7 @@ bool flag_every_day_timer = false;               // флаг для отправ
 ///↓↓↓ COMMON_CODE ↓↓↓///
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_003\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_004\Common_CODE.cpp"
 
 
 ///↓↓↓ НОЧНОЙ РЕЖИМ ↓↓↓///
@@ -290,6 +290,7 @@ bool clock_night_indication_humidity = true;     // ↑↑↑ // влажнос�
 void setup()                                     // стандартная функция Ардуино - выполняется один раз в начале //
 {
   ESP.wdtDisable();                              // отключаем software WDT //
+  delay(50);
   ESP.wdtEnable(10000);                          // включаем  software WDT с таймером на 10 секунд //
     /*
     https://bigdanzblog.wordpress.com/2019/10/08/watch-dog-timer-wdt-for-esp8266/
@@ -300,9 +301,9 @@ void setup()                                     // стандартная фу�
   */
 
   Serial.begin(115200);                          // запускаем Serial Port и определяем его скорость //
-  Serial.setTimeout(100);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
+  Serial.setTimeout(300);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
-  WiFi.setOutputPower(15.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
+  WiFi.setOutputPower(16.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
   object_TimeDate.set_UTC_time();
@@ -321,14 +322,12 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  debug();
-
   object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
   
   object_NightTime.update_NightTime();                                         // обновляем состояние ночного режима //
 
-  delay(10);                                                                   // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
-  bot_main.tick();                                                             // update telegram - получение сообщения из телеги и их обработка //
+  delay(10);                                                                        // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
+  bot_tick_and_call_debug();                                                        // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
 
   if (global_ERROR_flag == true)                                               // проверят были ли ошибки и если были - делает анимацию //
   {
@@ -774,21 +773,42 @@ void LOGtimer()                                  // отправка лога в
 {
   if (flag_every_day_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
   {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     if (!SD.begin(4))
     {
       send_alert("ERROR: Ошибка инициализации SD карты");
     }
 
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     String file_name = object_TimeDate.get_DateFULL() + ".txt";
     String buf_user_ID = object_array_users[0].get_id();
     File myFile = SD.open(file_name);
 
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+
     if (myFile)
     {
+    
       fb::File f(file_name, fb::File::Type::document, myFile);
       f.chatID = buf_user_ID;
 
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
       bot_second.sendFile(f, false);
+
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
 
       myFile.close();
     }
@@ -809,10 +829,6 @@ void LOGtimer()                                  // отправка лога в
 
 void LOGwrite()                                  // запись в лог //
 {
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
   if (!SD.begin(4))
   {
     send_alert("ERROR: Ошибка инициализации SD карты");
@@ -838,22 +854,30 @@ void LOGwrite()                                  // запись в лог //
   {
     send_alert("ERROR: Ошибка записи на SD карту");
   }
-
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
 }
 
 void LOGread()                                   // отправка лога по команде //
 {
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+
   if (!SD.begin(4))
   {
     send_alert("ERROR: Ошибка инициализации SD карты");
   }
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
   
   String file_name = object_TimeDate.get_DateFULL() + ".txt";
   String buf_user_ID = object_array_users[users_array_index].get_id();
   File myFile = SD.open(file_name);
+
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
 
   if (myFile)
   {

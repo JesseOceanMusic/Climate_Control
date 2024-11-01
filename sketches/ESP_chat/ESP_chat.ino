@@ -4,7 +4,7 @@
 
 #define THIS_IS_CHAT_CODE
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_003\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_004\Common_CODE.cpp"
 
 ///↓↓↓ ОТЛАДКА ↓↓↓///
 
@@ -973,6 +973,7 @@ SCD41 object_CO2_sensor;
 void setup()                                     // стандартная функция Ардуино - выполняется один раз в начале //
 {
   ESP.wdtDisable();                              // отключаем software WDT //
+  delay(50);
   ESP.wdtEnable(10000);                          // включаем  software WDT с таймером на 10 секунд //
     /*
     https://bigdanzblog.wordpress.com/2019/10/08/watch-dog-timer-wdt-for-esp8266/
@@ -983,9 +984,9 @@ void setup()                                     // стандартная фу�
   */
 
   Serial.begin(115200);                          // запускаем Serial Port и определяем его скорость //
-  Serial.setTimeout(100);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
+  Serial.setTimeout(300);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
-  WiFi.setOutputPower(15.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
+  WiFi.setOutputPower(16.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
 
   object_TimeDate.set_UTC_time();
@@ -1024,8 +1025,6 @@ void setup()                                     // стандартная фу�
 
 void loop()                                      // основной луп //
 {
-  debug();
-
   object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
   recuperator_button_check(false);                                                  // проверяем положение выключателя //
@@ -1033,7 +1032,7 @@ void loop()                                      // основной луп //
   close_air_dumpers_fast();                                                         // меняем быстро положение заслонок, если включили режим рекуперации //
 
   delay(10);                                                                        // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
-  bot_main.tick();                                                                  // update telegram - получение сообщения из телеги и их обработка //
+  bot_tick_and_call_debug();                                                        // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
 
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)         // таймер каждую нечетную минуту //
   {

@@ -43,17 +43,19 @@ byte users_array_index;
 bool shutdown_friends = false;
 const byte user_array_length = 7;
 
-const String meme_dir = "https://raw.githubusercontent.com/JesseOceanMusic/Climate_Control/refs/heads/main/memes/";
-
-const String meme_array[7] =
+const String memes_dir = "https://raw.githubusercontent.com/JesseOceanMusic/Climate_Control/refs/heads/main/memes/";
+const byte memes_amount = 9;
+const String memes_array[memes_amount] =
 {
-  "001.jpg",
-  "002.jpg",
-  "003.jpg",
-  "004.jpg",
-  "005.jpg",
-  "006.jpg",
-  "007.jpg",
+  "01.jpg",
+  "02.jpg",
+  "03.jpg",
+  "04.jpg",
+  "05.jpg",
+  "06.jpg",
+  "07.jpg",
+  "08.jpg",
+  "09.jpg",
 };
 
 class class_users
@@ -132,17 +134,19 @@ class class_users
     {
       if(_admin_flag == false) 
       {
-        this->send_message("Недостаточно прав доступа.");  // this-> обращение к вызванному объекту(экземпляру класса) //
-        
-        byte meme_index = random(0,   7);
+        byte meme_index = random(0,   (memes_amount + 1));
           //                     min: нижняя граница случайных значений, включительно. (опционально)
-          //                          max: верхняя граница случайных значений, не включительно.
+          //                           max: верхняя граница случайных значений, не включительно.
 
-        String buf_URL = meme_dir + meme_array[meme_index];
+        String buf_URL = memes_dir + memes_array[meme_index];
 
-        fb::File f("file.txt", fb::File::Type::photo, buf_URL);
+        String meme_name = "meme" + memes_array[meme_index];
+        fb::File f(meme_name, fb::File::Type::photo, buf_URL);
         f.chatID = _id;
         bot_main.sendFile(f);
+
+        delay(20);
+        this->send_message("Недостаточно прав доступа.");  // this-> обращение к вызванному объекту(экземпляру класса) //
       }
       return(_admin_flag);
     }
@@ -305,11 +309,9 @@ void Message_from_Telegram_converter(fb::Update& u)           // преобра�
   }
 }
 
-void setup_telegram_bots()
+void setup_telegram_bots()                       // настройки телеграм ботов //
 {
   bot_main.setToken(F(bot_main_Token));                    // установить токен
-  bot_second.setToken(F(bot_second_Token));                // установить токен
-
   bot_main.attachUpdate(Message_from_Telegram_converter);  // подключить обработчик обновлений
   bot_main.setPollMode(fb::Poll::Long, 20000);
                                //Sync   синхронный               (рекомендуемый период > 3500 мс)
@@ -318,11 +320,33 @@ void setup_telegram_bots()
   
   bot_main.setMemLimit(4000);                              // установить лимит памяти на ответ сервера (библиотека начнёт пропускать сообщения), умолч. 20.000
   bot_main.setLimit(1);                                    // установить лимит - кол-во сообщений в одном обновлении (умолч. 3)
+  bot_main.setTimeout(600);                                // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
 
-  bot_main.setTimeout(400);                                // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
-  bot_second.setTimeout(400);                              // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
+  bot_second.setToken(F(bot_second_Token));                // установить токен
+  bot_second.setPollMode(fb::Poll::Async, 3500);
+                                 //Sync   синхронный               (рекомендуемый период > 3500 мс)
+                                 //Async  асинхронный              (рекомендуемый период > 3500 мс)
+                                 //Long   асинхронный long polling (рекомендуемый период > 20000 мс) // Самый быстрый... //  
+  bot_second.setTimeout(2000);                             // установить таймаут ожидания ответа сервера (умолч. 2000 мс)  
 }
 
+void debug(bool can_i_send_message_flag);    // прототип функции //
+
+void bot_tick_and_call_debug()               // позволяет отправить сообщение без задержки в 1-2 секунды в режиме Long. Проблема есть только если сообщение отправляется вне обработчика входящий сообщений. // https://github.com/GyverLibs/FastBot2/blob/main/docs/3.start.md //
+{
+  #ifdef Jesse_yield_enable
+    yield();
+  #endif
+    
+  bool can_i_send_message_flag = false;
+  
+  if(bot_main.tick() == true && bot_main.isPolling() == false)    // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд).
+  {
+    can_i_send_message_flag = true;
+  }
+
+  debug(can_i_send_message_flag);
+}
 
 /// ↓↓↓ ВРЕМЯ ↓↓↓ ///
 
@@ -512,7 +536,6 @@ void send_reset_info()                           // отчёт о причине
 ///↓↓↓ Debug ↓↓↓///
 
 bool debug_flag = false;
-time_t send_report_timer;
 
 unsigned long loop_time_in_millis_counter;
 
@@ -522,19 +545,22 @@ unsigned int loop_counter_for_avg;
 unsigned int loop_time_in_millis_min;
 unsigned int loop_time_in_millis_max;
 
-bool loop_time_in_millis_is_it_first;
+unsigned int loop_messege_millis_time;
 
-void debug()
+bool loop_time_in_millis_is_it_first = true;
+
+void debug(bool can_i_send_message_flag)
 {
   if(debug_flag == true)
   {
     if(loop_time_in_millis_is_it_first == true)
     {
-      loop_time_in_millis_counter = millis();
+      loop_messege_millis_time = millis() - loop_time_in_millis_counter;       // записываем время которое ушло на отправку сообщения
+      loop_time_in_millis_counter = millis();                                  // обнуляем счетчик, чтобы не учитывать отправку сообщения в счётчике и при первом запуске debug - не было неправильного значения
       loop_time_in_millis_is_it_first = false;
+
       loop_time_in_millis_min = 999999;
       loop_time_in_millis_max = 0;
-
       loop_time_in_millis_sum_for_avg = 0;
       loop_counter_for_avg = 0;
     }
@@ -557,23 +583,21 @@ void debug()
       loop_time_in_millis_sum_for_avg += buf_timer;
       loop_counter_for_avg++;
 
-      if (object_TimeDate.get_UTC() - send_report_timer > 9 && loop_counter_for_avg != 0)           // на всякий случай исключить деление на 0 //
+      if (can_i_send_message_flag == true && loop_counter_for_avg != 0)           // на всякий случай исключить деление на 0 // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд). //
       {
-
         unsigned int loop_time_in_millis_avg = loop_time_in_millis_sum_for_avg / loop_counter_for_avg;
 
-        String buf_message  = "Время лупа без учета отправки этого сообщения:\n";
-              buf_message +=  "min: "               + String(loop_time_in_millis_min) + " миллисекунд.\n" +\
-                              "avg: "               + String(loop_time_in_millis_avg) + " миллисекунд.\n" +\
-                              "max: "               + String(loop_time_in_millis_max) + " миллисекунд.\n" +\
-                              "Количество циклов: "   + String(loop_counter_for_avg)    + "\n\n"            +\
+        String buf_message  = "Количество циклов: "   + String(loop_counter_for_avg)    + "\n\n"                                      +\
+                              "Время отправки предыдущего debug сообщения: " + String(loop_messege_millis_time) + " миллисекунд.\n"   +\
+                              "Время лупов без учёта отправки debug сообщения:\n"                                                     +\
+                              "min: "               + String(loop_time_in_millis_min) + " миллисекунд.\n"                             +\
+                              "avg: "               + String(loop_time_in_millis_avg) + " миллисекунд.\n"                             +\
+                              "max: "               + String(loop_time_in_millis_max) + " миллисекунд.\n\n"                           +\
                               "ESP.getFreeHeap(): " + String(ESP.getFreeHeap())       + " байт.";
 
         object_array_users[2].send_message(buf_message);
 
         loop_time_in_millis_is_it_first = true;
-
-        send_report_timer = object_TimeDate.get_UTC();
       }
     }
   }
