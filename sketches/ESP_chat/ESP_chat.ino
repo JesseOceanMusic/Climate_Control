@@ -4,7 +4,7 @@
 
 #define THIS_IS_CHAT_CODE
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_004\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_005\Common_CODE.cpp"
 
 ///↓↓↓ ОТЛАДКА ↓↓↓///
 
@@ -863,7 +863,7 @@ class SCD41                                      // класс датчика С
     {
       if (_CO2 < 200)
       {
-        send_alert("ERROR уровень со2: " + String(_CO2) + "ppm" + "\n\n\n Если ошибка повторяется - попробуйте перезапуск /35101@JOArduinoChatBOT");
+        send_alert("ERROR уровень со2: " + String(_CO2) + "ppm" + "\n\n\n Если ошибка повторяется - попробуйте перезапуск /35101@" + This_bot_name);
         global_ERROR_flag = true;
       }
     }
@@ -873,8 +873,8 @@ class SCD41                                      // класс датчика С
       if (_CO2 > _co2_high_alert)
       {
         send_alert("ALERT уровень со2: " + String(_CO2) + "ppm" +\
-                   "\n\nИзменить температуру термостата (если снизить температуру термостата - колчество воздуха с улицы увеличится и со2 снизиться): /104@JOArduinoChatBOT" +\
-                   "\n\nНастройка оповещений: /103@JOArduinoChatBOT");
+                   "\n\nИзменить температуру термостата (если снизить температуру термостата - колчество воздуха с улицы увеличится и со2 снизиться): /104@" + This_bot_name +\
+                   "\n\nНастройка оповещений: /103@" + This_bot_name);
       }
     }
 
@@ -1220,10 +1220,10 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 103:                                  // установка оповещений (ALERT) //
     { 
-      String buf = "Установка оповещений: \n\n Температура нижняя граница для рекуператора (/10301@JOArduinoChatBOT). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
-                    "\n Влажность нижняя граница (/10302@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()) +\
-                    "\n Влажность верхняя граница (/10303@JOArduinoChatBOT). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()) +\
-                    "\n СО2 верхняя граница (/10304@JOArduinoChatBOT). Текущее значение: " + String(object_CO2_sensor.get_co2_high_alert());
+      String buf = "Установка оповещений: \n\n Температура нижняя граница для рекуператора (/10301@" + This_bot_name + "). Текущее значение: " + String(object_ds18b20_0.get_crit_temp_low_alert()) +\
+                    "\n Влажность нижняя граница (/10302@" + This_bot_name + "). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_low_alert()) +\
+                    "\n Влажность верхняя граница (/10303@" + This_bot_name + "). Текущее значение: " + String(object_Temp_Humidity_sensor.get_humidity_high_alert()) +\
+                    "\n СО2 верхняя граница (/10304@" + This_bot_name + "). Текущее значение: " + String(object_CO2_sensor.get_co2_high_alert());
       object_array_users[users_array_index].send_message(buf);
       break;
     }
@@ -1308,7 +1308,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 310:                                  // ручная инициализация полноценной калибровки заслонок //
     {
-      object_array_users[users_array_index].send_message("Полноценная калибровка займет несколько минут. \n\n*Полноценная калибровка сбрасывает крайние положения заслонок выставленные вручную.\n\n\nПродолжить? - /31001@JOArduinoChatBOT");
+      object_array_users[users_array_index].send_message("Полноценная калибровка займет несколько минут. \n\n*Полноценная калибровка сбрасывает крайние положения заслонок выставленные вручную.\n\n\nПродолжить? - /31001@" + This_bot_name);
       break;
     }
 
@@ -1369,7 +1369,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 350:                                  // установка разрешения ds12b20 на 12bit //
     {
-      object_array_users[users_array_index].send_message("Эта комана необходима в случае, если настройки датчиков температуры сбились и показывают значения с разрешением 9бит вместо 12бит (разрешение 9бит - 0,5, разрешение 12бит - 0.0625)\n\n\nПродолжить? - /35001@JOArduinoChatBOT");
+      object_array_users[users_array_index].send_message("Эта комана необходима в случае, если настройки датчиков температуры сбились и показывают значения с разрешением 9бит вместо 12бит (разрешение 9бит - 0,5, разрешение 12бит - 0.0625)\n\n\nПродолжить? - /35001@" + This_bot_name);
       break;
     }
 
@@ -1391,7 +1391,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 351:                                  // перезапуск датчика со2 //
     {
-      object_array_users[users_array_index].send_message("Если датчик СО2 перестал отдавать показания или глючит - можно попробовать его перезапустить.\n\n\nПродолжить? - /35101@JOArduinoChatBOT");
+      object_array_users[users_array_index].send_message("Если датчик СО2 перестал отдавать показания или глючит - можно попробовать его перезапустить.\n\n\nПродолжить? - /35101@" + This_bot_name);
       break;
     }
 
@@ -1406,7 +1406,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 352:                                  // рекалибровка со2 //
     {
-      object_array_users[users_array_index].send_message("Рекалибровка датчика СО2 нужна в случае, если даже при открытых окнах он не показывает значение около 400 и нужно его рекалибровать.\n\nПри рекалибровке необходимо максимально проветрить помещение, чтобы воздух был близок к уличному.\n\n\nПродолжить? - /35201@JOArduinoChatBOT");
+      object_array_users[users_array_index].send_message("Рекалибровка датчика СО2 нужна в случае, если даже при открытых окнах он не показывает значение около 400 и нужно его рекалибровать.\n\nПри рекалибровке необходимо максимально проветрить помещение, чтобы воздух был близок к уличному.\n\n\nПродолжить? - /35201@" + This_bot_name);
       break;      
     }
 
@@ -1422,7 +1422,7 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 353:                                  // сброс на заводские настройки со2 //
     {
-      object_array_users[users_array_index].send_message("Сброс на заводские настройки сбрасывает все настройки, в том числе параметры калбировки датчика.\n\n\nПродолжить? - /35301@JOArduinoChatBOT");
+      object_array_users[users_array_index].send_message("Сброс на заводские настройки сбрасывает все настройки, в том числе параметры калбировки датчика.\n\n\nПродолжить? - /35301@" + This_bot_name);
       break;      
     }
 

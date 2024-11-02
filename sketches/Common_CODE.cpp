@@ -26,6 +26,7 @@
   FastBot2 bot_second;                           // BOT "Calibrate" //
   #define bot_second_Token BOT_TOKEN3
 
+  const String This_bot_name     = "JOArduinoChatBOT";
   const String Opposite_bot_name = "JOArduinoLogsBOT";
 #endif
 
@@ -35,6 +36,7 @@
   FastBot2 bot_second;                           // BOT "Backup" //
   #define bot_second_Token BOT_TOKEN4
 
+  const String This_bot_name     = "JOArduinoLogsBOT";
   const String Opposite_bot_name = "JOArduinoChatBOT";
 #endif
 
@@ -143,6 +145,7 @@ class class_users
         String meme_name = "This_Is_Jesse_O_Meme_" + memes_array[meme_index];
         fb::File f(meme_name, fb::File::Type::photo, buf_URL);
         f.chatID = _id;
+        delay(20);
         bot_main.sendFile(f);
 
         delay(20);
@@ -240,7 +243,7 @@ bool Message_is_it_known_user(String CHAT_IDcur, String income_message)         
     }
   }
 
-  send_alert("INTRUDER: " + CHAT_IDcur);
+  send_alert("INTRUDER ID: " + CHAT_IDcur + "\nINTRUDER MESSAGE: " + income_message);
   return(false);
 }
 
@@ -278,8 +281,20 @@ void Message_from_Telegram_converter(fb::Update& u)           // преобра�
     yield();
   #endif
 
-  String CHAT_IDcur = u.message().chat().id();
-  String income_message = u.message().text().toString();
+  String CHAT_IDcur;
+  String income_message;
+
+  if (u.isQuery() == true)
+  {
+    CHAT_IDcur = u.query().message().chat().id().toString();
+    income_message = u.query().data().toString();    
+  }
+
+  else
+  {
+    CHAT_IDcur = u.message().chat().id().toString();
+    income_message = u.message().text().toString();
+  }
 
   if (Message_is_it_known_user(CHAT_IDcur, income_message))
   {
