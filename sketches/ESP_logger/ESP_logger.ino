@@ -19,7 +19,7 @@ bool flag_every_day_timer = false;               // флаг для отправ
 ///↓↓↓ COMMON_CODE ↓↓↓///
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_005\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_006\Common_CODE.cpp"
 
 
 /// ↓↓↓ АДРЕСНАЯ LED ЛЕНТА ↓↓↓ ///
@@ -27,21 +27,21 @@ bool flag_every_day_timer = false;               // флаг для отправ
 
 #include "FastLED.h"                             // LED библиотека //   
 
-#define NUM_LEDS1 240                            // Бра //       
-#define DATA_PIN1 D1                             // ↑↑↑ //
-CRGB array_LED_sconce [NUM_LEDS1];               // ↑↑↑ //
+#define Bra_Leds_Amount 240                      // Бра //       
+#define Bra_Pin D1                               // ↑↑↑ //
+CRGB array_LED_sconce [Bra_Leds_Amount];         // ↑↑↑ //
 
-#define NUM_LEDS2 60                             // Полоска //   
-#define DATA_PIN2 D2                             // ↑↑↑ //
-CRGB array_LED_line [NUM_LEDS2];                 // ↑↑↑ //
+#define Line_Leds_Amount 60                      // Полоска //   
+#define Line_Pin D2                              // ↑↑↑ //
+CRGB array_LED_line [Line_Leds_Amount];          // ↑↑↑ //
 
-#define NUM_LEDS3 191                            // Часы //   
-#define DATA_PIN3 D4                             // ↑↑↑ //
-CRGB array_LED_clock [NUM_LEDS3];                // ↑↑↑ //
-
+#define Clock_Leds_Amount 191                    // Часы //   
+#define Clock_Pin D4                             // ↑↑↑ //
+CRGB array_LED_clock [Clock_Leds_Amount];        // ↑↑↑ //
 
 int HSVhue1;                                     // переменная, которая хранит значение последнего случайного hue (цвет) //
 int HSVsat1;                                     // переменная, которая хранит значение последнего случайного saturatuion (насыщенность) //
+byte depth;
 int HSVval1day = 80;                             // value (яркость) бра днём // 
 int HSVval2day = 40;                             // value (яркость) линии днём //
 int HSVval3day = 100;                            // value (яркость) часов днём //
@@ -69,173 +69,328 @@ byte RGB_clock_night [3] = {1, 1, 0,};           // цвет часов ночь
 
 void FillSolidMY()                               // заливка, чтобы не ждать при изменение яркости и дневного/ночного режима через команду //
 {
-  fill_solid(array_LED_sconce, NUM_LEDS1, CHSV(HSVhue1, HSVsat1, HSVval1cur));
-  fill_solid(array_LED_line, NUM_LEDS2, CHSV(HSVhue1, HSVsat_line_day, HSVval2cur));
+  fill_solid(array_LED_sconce, Bra_Leds_Amount, CHSV(HSVhue1, HSVsat1, HSVval1cur));
+  fill_solid(array_LED_line, Line_Leds_Amount, CHSV(HSVhue1, HSVsat_line_day, HSVval2cur));
   FastLED.delay(10);
 }
 
-void Led_animation_up()                          // анимация подсветка "идёт наверх" //
+namespace Animation
 {
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
-
-  HSVhue1 = random(0, 255);
-  HSVsat1 = random(50, 255);
-  int depth = random(0, 10);
-  depth = (depth * 20);
-
-  for(int i = NUM_LEDS2 - 1; i > -1; i--)
+  enum
   {
-    array_LED_line [i] = CHSV(HSVhue1, HSVsat_line_day, HSVval2cur);
-    FastLED.delay(60);
-    
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-  }
+    NONE,
+    UP_PART_0,
+    UP_PART_1,
+    UP_PART_2,
+    DOWN_PART_0,
+    DOWN_PART_1,
+    DOWN_PART_2,
+    CLOCK,
+    ERROR_PART_0,
+    ERROR_PART_1,
+    ERROR_PART_2,
+    ERROR_PART_3,
+    ERROR_PART_4,
+  } state;
 
-  delay(500);
+  unsigned long timer_millis;
+  int counter;
 
-  for(int i = 0; i < (NUM_LEDS1 - depth); i++)
-  {
-    array_LED_sconce [i] = CHSV(HSVhue1, HSVsat1, HSVval1cur);
-    FastLED.delay(20);
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-  }
+  int error_p3_low;
+  int error_p3_high;
+  int error_p3_brightnes;
 }
 
-void Led_animation_down()                        // анимация подсветки "идёт вниз" //
+void UP_Func_Part_0()
 {
   HSVhue1 = random(0, 255);
   HSVsat1 = random(50, 255);
-  byte depth = random(0, 10);
-  depth = (depth * 20);
-  for(int i = (NUM_LEDS1)-1; i >= depth; i--)
-  {
-    array_LED_sconce [i] = CHSV(HSVhue1, HSVsat1, HSVval1cur);
-    FastLED.delay(20);
+  depth   = random(0, 10);
+  depth   = (depth * 20);
 
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
+  Animation::state   = Animation::UP_PART_1;
+  Animation::counter = Line_Leds_Amount - 1;
+}
+
+void UP_Func_Part_1()
+{
+  if(Animation::counter > -1)
+  {
+    array_LED_line [Animation::counter] = CHSV(HSVhue1, HSVsat_line_day, HSVval2cur);
+    FastLED.delay(60);
+    Animation::counter--;
   }
 
-  delay(500);
-
-  for(int i = 0; i < NUM_LEDS2; i++)
+  else
   {
-    array_LED_line [i] = CHSV(HSVhue1, HSVsat_line_day, HSVval2cur);
-    FastLED.delay(60);
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif    
+    Animation::state = Animation::UP_PART_2;
+    Animation::counter = 0;
   }
 }
 
-void Led_animation_error()                       // подсветка - ошибка //
+void UP_Func_Part_2()
 {
-  fill_solid(array_LED_sconce, NUM_LEDS1, CHSV(0, 0, 0));
-  fill_solid(array_LED_line, NUM_LEDS2, CHSV(0, 0, 0));
-
-  for(int i = (NUM_LEDS2)-1; i > -1; i--)
+  if(Animation::counter < (Bra_Leds_Amount - depth))
   {
-    if(i % 2 > 0)
+    array_LED_sconce [Animation::counter] = CHSV(HSVhue1, HSVsat1, HSVval1cur);
+    FastLED.delay(20);
+    Animation::counter++;
+  }
+
+  else
+  {
+    Animation::state = Animation::CLOCK;
+  }
+}
+
+void DOWN_Func_Part_0()
+{
+  HSVhue1 = random(0, 255);
+  HSVsat1 = random(50, 255);
+  depth   = random(0, 10);
+  depth   = (depth * 20);
+
+  Animation::state   = Animation::DOWN_PART_1;
+  Animation::counter = Bra_Leds_Amount - 1;  
+}
+
+void DOWN_Func_Part_1()
+{
+  if(Animation::counter >= depth)
+  {
+    array_LED_sconce [Animation::counter] = CHSV(HSVhue1, HSVsat1, HSVval1cur);
+    FastLED.delay(20);
+    Animation::counter--;
+  }
+
+  else
+  {
+    Animation::state   = Animation::DOWN_PART_2;
+    Animation::counter = 0;
+  }
+}
+
+void DOWN_Func_Part_2()
+{
+  if(Animation::counter < Line_Leds_Amount)
+  {
+    array_LED_line [Animation::counter] = CHSV(HSVhue1, HSVsat_line_day, HSVval2cur);
+    FastLED.delay(60);
+    Animation::counter++;
+  }
+
+  else
+  {
+    Animation::state = Animation::CLOCK;
+  }
+}
+
+void ERROR_Func_Part_0()
+{
+  fill_solid(array_LED_sconce, Bra_Leds_Amount,  CHSV(0, 0, 0));
+  fill_solid(array_LED_line,   Line_Leds_Amount, CHSV(0, 0, 0));
+
+  Animation::state   = Animation::ERROR_PART_1;
+  Animation::counter = Line_Leds_Amount - 1;  
+}
+
+void ERROR_Func_Part_1()
+{
+  if(Animation::counter > -1)
+  {
+    if(Animation::counter % 2 > 0)
     {
-      array_LED_line [i] = CHSV(140, 255, 255);
+      array_LED_line [Animation::counter] = CHSV(140, 255, 255);
     }
+
     else
     {
-      array_LED_line [i] = CHSV(255, 255, 255);
+      array_LED_line [Animation::counter] = CHSV(255, 255, 255);
     }
     FastLED.delay(16);
-
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif    
+    Animation::counter--;   
   }
 
-  for(int i = 0; i < 12; i++)
+  else
   {
-    int k = i * 20;
-    for(int d = 0; d < 11; d += 10)
+    Animation::state = Animation::ERROR_PART_2;
+    Animation::counter = 0;
+    Animation::timer_millis = millis();
+  }
+}
+
+void ERROR_Func_Part_2()
+{
+  if(millis() - Animation::timer_millis > 480)
+  {
+    if(Animation::counter < 12)
     {
-      for (int h = 0; h < 10; h++)
+      int k = Animation::counter * 20;
+      for(int d = 0; d < 11; d += 10)
       {
-        if (h >= 0 && h <= 4)
+        for (int h = 0; h < 10; h++)
         {
-          array_LED_sconce [k+h+d] = CHSV(140, 255, 255);
-        }
-        else
-        {
-          array_LED_sconce [k+h+d] = CHSV(255, 255, 255);
-        }
-
-        #ifdef Jesse_yield_enable
-          yield();
-        #endif
-      }       
+          if (h >= 0 && h <= 4)
+          {
+            array_LED_sconce [k+h+d] = CHSV(140, 255, 255);
+          }
+          else
+          {
+            array_LED_sconce [k+h+d] = CHSV(255, 255, 255);
+          }
+        }       
+      }
+      FastLED.delay(20);
+      Animation::counter++; 
     }
-    FastLED.delay(500);
 
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif    
+    else
+    {
+      Animation::state = Animation::ERROR_PART_3;
+      Animation::counter = 0;
+      Animation::error_p3_low       = 0;
+      Animation::error_p3_high      = 5;
+      Animation::error_p3_brightnes = 255;
+      delay(100);
+    }
+    Animation::timer_millis = millis();
   }
 
-  delay(100);
+}
 
-  int low = 0;
-  int high = 5;
-  int brightnes_local_val = 255;
-  for (int s = 0; s < 27; s++)
+void ERROR_Func_Part_3()
+{
+  if(Animation::counter < 27)
   {
     for(int i = 0; i < 12; i++)
     {
-      brightnes_local_val--;
-      brightnes_local_val = constrain(brightnes_local_val, 0, 255);       // чтобы плавно снизить яркость в 0...
-      int k = i*20;
+      Animation::error_p3_brightnes--;
+      Animation::error_p3_brightnes = constrain(Animation::error_p3_brightnes, 0, 255);       // чтобы плавно снизить яркость в 0...
+      int k = i * 20;
       for(int d = 0; d < 11; d += 10)
       {
-        array_LED_sconce [k+d+low] = CHSV(255, 255, brightnes_local_val);
-        array_LED_sconce [k+d+high] = CHSV(140, 255, brightnes_local_val);           
+        array_LED_sconce [k + d + Animation::error_p3_low] = CHSV(255, 255, Animation::error_p3_brightnes);
+        array_LED_sconce [k + d + Animation::error_p3_high] = CHSV(140, 255, Animation::error_p3_brightnes);           
 
-        #ifdef Jesse_yield_enable
-          yield();
-        #endif
       }
-      FastLED.delay(30);
+      FastLED.delay(30);     
+    }
+    Animation::error_p3_low++;
+    Animation::error_p3_high++;
+    if (Animation::error_p3_low > 9)
+    {
+      Animation::error_p3_low = Animation::error_p3_low % 10;
+    }
+    if (Animation::error_p3_high > 9)
+    {
+      Animation::error_p3_high = Animation::error_p3_high % 10;
+    }
+    Animation::counter++;
+  }
+  
+  else
+  {
+    Animation::state = Animation::ERROR_PART_4;
+    Animation::counter = 0;
+    delay(100);
+  }
+}
 
-      #ifdef Jesse_yield_enable
-        yield();
-      #endif      
-    }
-    low++;
-    high++;
-    if (low > 9)
-    {
-      low = low % 10;
-    }
-    if (high > 9)
-    {
-      high = high % 10;
-    }   
+void ERROR_Func_Part_4()
+{
+  if(Animation::counter < Line_Leds_Amount)
+  {
+    array_LED_line [Animation::counter] = CHSV(0, 0, 0);
+    FastLED.delay(20);
+    Animation::counter++; 
   }
 
-  delay(100);
-
-  for(int i = 0; i < NUM_LEDS2; i++)
+  else
   {
-    array_LED_line [i] = CHSV(0, 0, 0);
-    FastLED.delay(20);
+    Animation::state = Animation::NONE;
+  }
+}
 
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif    
+void Led_Animation_Check()
+{
+  switch (Animation::state)
+  {
+    case Animation::UP_PART_0:
+    {
+      UP_Func_Part_0();
+      break;
+    }
+
+    case Animation::UP_PART_1:
+    {
+      UP_Func_Part_1();
+      break;
+    }
+
+    case Animation::UP_PART_2:
+    {
+      UP_Func_Part_2();
+      break;
+    }
+
+    case Animation::DOWN_PART_0:
+    {
+      DOWN_Func_Part_0();
+      break;
+    }
+
+    case Animation::DOWN_PART_1:
+    {
+      DOWN_Func_Part_1();
+      break;
+    }
+
+    case Animation::DOWN_PART_2:
+    {
+      DOWN_Func_Part_2();
+      break;
+    }
+
+    case Animation::CLOCK:
+    {
+      clock_master();
+      break;
+    }
+
+    case Animation::ERROR_PART_0:
+    {
+      ERROR_Func_Part_0();
+      break;
+    }
+
+    case Animation::ERROR_PART_1:
+    {
+      ERROR_Func_Part_1();
+      break;
+    }
+
+    case Animation::ERROR_PART_2:
+    {
+      ERROR_Func_Part_2();
+      break;
+    }
+
+    case Animation::ERROR_PART_3:
+    {
+      ERROR_Func_Part_3();
+      break;
+    }        
+
+    case Animation::ERROR_PART_4:
+    {
+      ERROR_Func_Part_4();
+      break;
+    } 
+
+    default:
+    {
+      break;
+    }
   }
 }
 
@@ -328,6 +483,7 @@ class class_NightTime                            // класс ночного р
       HSVval3cur = HSVval3night;
       _NightTimeState    = NightTime::State::MANUAL_ON;
       _NightTimeDimState = NightTime::DimState::OFF;                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+      Animation::state   = Animation::NONE;
       FillSolidMY();
       clock_master();
     }
@@ -339,6 +495,7 @@ class class_NightTime                            // класс ночного р
       HSVval3cur = HSVval3day;
       _NightTimeState    = NightTime::State::MANUAL_OFF;
       _NightTimeDimState = NightTime::DimState::OFF;                // необходимо, чтобы прервать плавное изменение яркости если ночной режим был переключен в процессе изменения яркости //
+      Animation::state   = Animation::NONE;
       FillSolidMY();
       clock_master();
     }
@@ -427,7 +584,7 @@ class_NightTime object_NightTime;                // создаем экземп�
 // шестой сегмент - нижний-правый. //
 // седьмой сегмент - верхный-правый. //
 
-byte ClockArray_main [NUM_LEDS3];                // основной массив для отображения данных (результат сложения 13 цифр + точка, двоеточие, процент) //
+byte ClockArray_main [Clock_Leds_Amount];                // основной массив для отображения данных (результат сложения 13 цифр + точка, двоеточие, процент) //
 byte ArrayGlobalCounter = 0;                     // счетчик для сложения массивов //
 
 class class_Clock                                // класс часов //
@@ -726,7 +883,7 @@ void clock_animation()                           // анимация часов 
 
   if (HSVval3cur <= HSVval3night)                               // если яркость меньше или равна ночному режиму, значит сейчас ночной режим. анимации отключена, управление по RGB. //
   {
-    for(int i = 0; i < NUM_LEDS3; i++)
+    for(int i = 0; i < Clock_Leds_Amount; i++)
     {
       array_LED_clock [i] = CRGB((RGB_clock_night [0]*HSVval3cur*ClockArray_main [i]),(RGB_clock_night [1]*HSVval3cur*ClockArray_main [i]),(RGB_clock_night [2]*HSVval3cur*ClockArray_main [i]));
 
@@ -741,7 +898,7 @@ void clock_animation()                           // анимация часов 
   {
     if (object_TimeDate.get_MIN() % 2 > 0)                                        // анимация снизу вверх каждую нечетную минуту
     {
-      for(int i = 0; i < NUM_LEDS3; i++)
+      for(int i = 0; i < Clock_Leds_Amount; i++)
       {
         array_LED_clock [i] = CHSV(HSVhue_clock, HSVsat_clock_day, (HSVval3cur*ClockArray_main [i]));
         FastLED.delay(20);
@@ -754,7 +911,7 @@ void clock_animation()                           // анимация часов 
 
     else                                                        // анимация сверху вниз каждую четную минуту
     {
-      for(int i = NUM_LEDS3 - 1; i >= 0; i--)
+      for(int i = Clock_Leds_Amount - 1; i >= 0; i--)
       {
         array_LED_clock [i] = CHSV(HSVhue_clock, HSVsat_clock_day, (HSVval3cur*ClockArray_main [i]));
         FastLED.delay(20);
@@ -768,7 +925,7 @@ void clock_animation()                           // анимация часов 
 
   else                                                          // во всех других случаях - анимация отключена, режим HSV //
   {
-    for(int i = 0; i < NUM_LEDS3; i++)
+    for(int i = 0; i < Clock_Leds_Amount; i++)
     {
       array_LED_clock [i] = CHSV(HSVhue_clock, HSVsat_clock_day, (HSVval3cur*ClockArray_main [i]));
 
@@ -778,6 +935,8 @@ void clock_animation()                           // анимация часов 
     }
     FastLED.delay(20);
   }
+
+  Animation::state = Animation::NONE;
 }
 
 String clock_indication()                        // отображение текущего состояния отображения данных на табло в текстовом виде //
@@ -871,9 +1030,9 @@ void setup()                                     // стандартная фу�
 
   setup_telegram_bots();
 
-  FastLED.addLeds<WS2812, DATA_PIN1, GRB>(array_LED_sconce, NUM_LEDS1);   // определяем лед ленту БРА //
-  FastLED.addLeds<WS2812, DATA_PIN2, GRB>(array_LED_line, NUM_LEDS2);     // определяем лед ленту ЛИНИИ //
-  FastLED.addLeds<WS2812, DATA_PIN3, GRB>(array_LED_clock, NUM_LEDS3);    // определяем лед ленту ЧАСОВ //
+  FastLED.addLeds<WS2812, Bra_Pin, GRB>(array_LED_sconce, Bra_Leds_Amount);   // определяем лед ленту БРА //
+  FastLED.addLeds<WS2812, Line_Pin, GRB>(array_LED_line, Line_Leds_Amount);     // определяем лед ленту ЛИНИИ //
+  FastLED.addLeds<WS2812, Clock_Pin, GRB>(array_LED_clock, Clock_Leds_Amount);    // определяем лед ленту ЧАСОВ //
   FastLED.setBrightness(255);                                             // задаём глобальную яркость всех лент, как максимальную //
 
   send_reset_info();
@@ -883,27 +1042,27 @@ void setup()                                     // стандартная фу�
 void loop()                                      // основной луп //
 {
   object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
-  
+ 
   object_NightTime.update_NightTime();                                         // обновляем состояние ночного режима //
 
-  delay(10);                                                                        // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
-  bot_tick_and_call_debug();                                                        // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
+  bot_tick_and_call_debug();                                                   // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
 
-  if (global_ERROR_flag == true)                                               // проверят были ли ошибки и если были - делает анимацию //
+  if (global_ERROR_flag == true && Animation::state == Animation::NONE)        // проверят были ли ошибки и если были - делает анимацию //
   {
     if (object_NightTime.get_NightTimeState() == 1)                            // 1 значит - днём можно включить ночной режим, чтобы отключить анимацию ошибки во время отладки // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл до след вечера //
     {    
-      Led_animation_error();                                                   // если были ошибки и сейчас день, без включенного ночного режима - запускаем анимацию ошибки //
+      Animation::state = Animation::ERROR_PART_0;                              // если были ошибки и сейчас день, без включенного ночного режима - запускаем анимацию ошибки //
     }
     global_ERROR_flag = false;                                                 // в любом случае сбрасываем флаг ошибки, чтобы если ночью была ошибка, то утром первым делом она не захерачила анимацию //     
   }
-  
+
+  Led_Animation_Check();
+
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)    // таймер каждую нечетную минуту //
   {
     LOGtimer(); 
     object_NightTime.Night_Time_Dim();
-    Led_animation_up();
-    clock_master();
+    Animation::state = Animation::UP_PART_0;
     flag_every_minute_timer = true;
   }
 
@@ -912,8 +1071,7 @@ void loop()                                      // основной луп //
     SYNCdata = "";                                                             // обнуляем стринг с датой, чтобы при ошибках синхронизации на часах не продолжали висеть старые данные //
     SYNCstart();
     object_NightTime.Night_Time_Dim();
-    Led_animation_down();
-    clock_master();
+    Animation::state = Animation::DOWN_PART_0;
     restart_check();
     flag_every_minute_timer = false;
   }
@@ -1073,19 +1231,19 @@ void Message_command_send_data(int text_int)      // вызывается из C
 
     case 107:                                                       // анимация "снизу вверх" //
     {
-      Led_animation_up();
+      Animation::state = Animation::UP_PART_0;
       break;
     }
 
     case 108:                                                       // анимация "сверху вниз" //
     {
-      Led_animation_down();
+      Animation::state = Animation::DOWN_PART_0;
       break;
     }
 
     case 109:                                                       // анимация "ошибка" //
     {
-      Led_animation_error();
+      Animation::state = Animation::ERROR_PART_0;
       break;
     }
 
@@ -1296,13 +1454,13 @@ void SYNCstart()                                 // получение темп�
 
   Serial.println(object_TimeDate.get_UTC());                              // отправляем время для синхронизации //
   
-  String SYNCmessage = Serial.readString();
-
-  if(SYNCmessage.length() > 2)                                            // Проверка что вообще что-то пришло //
+  if (Serial.available())                                                 // если что-то есть в серил, то читаем //
   {
     #ifdef Jesse_yield_enable
       yield();
     #endif
+
+    String SYNCmessage = Serial.readString();
 
     byte dividerIndex = SYNCmessage.indexOf(';');
     String buf_SYNCtime = SYNCmessage.substring(0, dividerIndex);         // строка с временем для проверки рассинхронизации по времени

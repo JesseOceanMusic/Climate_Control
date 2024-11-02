@@ -45,6 +45,8 @@ byte users_array_index;
 bool shutdown_friends = false;
 const byte user_array_length = 7;
 
+String buf_alert_message;
+
 const String memes_dir = "https://raw.githubusercontent.com/JesseOceanMusic/Climate_Control/refs/heads/main/memes/";
 const byte memes_amount = 9;
 const String memes_array[memes_amount] =
@@ -98,6 +100,18 @@ class class_users
         bot_main.sendMessage(fb::Message(input, _id));
       }
     }
+
+    void send_alert_from_buf_alert_message()
+    {
+      #ifdef Jesse_yield_enable
+        yield();
+      #endif
+
+      if (_alert_flag == true)
+      {
+        bot_main.sendMessage(fb::Message(buf_alert_message, _id));
+      }
+    }    
 
     void set_id(String id)
     {
@@ -215,10 +229,42 @@ bool class_users::check_id(String CHAT_IDcur, String income_message)
 
 void send_alert(String input_message)            // функция для отправки уведомлений пользователям, которые на них подписаны //
 {
-  for(int i = 0; i < user_array_length; i++)
+  if(buf_alert_message.length() < 800)
   {
-    object_array_users[i].send_alert(input_message);
+    if(buf_alert_message.length() < 2)
+    {
+      buf_alert_message = input_message;
+    }
+
+    else
+    {
+      buf_alert_message += "\n\n";
+      buf_alert_message += input_message;
+    }
   }
+
+  else
+  {
+    for(int i = 0; i < user_array_length; i++)
+    {
+      object_array_users[i].send_alert("ERROR: Переполнен стринг buf_alert_message, отправка сообщения вне очереди:");
+      delay(20);
+      object_array_users[i].send_alert_from_buf_alert_message();
+    }
+    buf_alert_message = "";
+  }
+}
+
+void is_there_an_alert_to_send(bool can_i_send_message_flag)
+{
+ if(can_i_send_message_flag == true && buf_alert_message.length() > 2)
+ {
+    for(int i = 0; i < user_array_length; i++)
+    {
+      object_array_users[i].send_alert_from_buf_alert_message();
+    }
+    buf_alert_message = "";
+ }
 }
 
 bool Message_is_it_known_user(String CHAT_IDcur, String income_message)                  // Проверка входящего сообщения от пользователя на права доступа //
@@ -352,15 +398,22 @@ void bot_tick_and_call_debug()               // позволяет отправ�
   #ifdef Jesse_yield_enable
     yield();
   #endif
-    
+  static unsigned long millis_timer_for_tick;
+
   bool can_i_send_message_flag = false;
-  
-  if(bot_main.tick() == true && bot_main.isPolling() == false)    // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд).
+
+  if(millis() - millis_timer_for_tick > 15)
   {
-    can_i_send_message_flag = true;
-  }
+    if(bot_main.tick() == true && bot_main.isPolling() == false)    // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд).
+    {
+      can_i_send_message_flag = true;
+    }
+
+    millis_timer_for_tick = millis();
+  }  
 
   debug(can_i_send_message_flag);
+  is_there_an_alert_to_send(can_i_send_message_flag);
 }
 
 /// ↓↓↓ ВРЕМЯ ↓↓↓ ///
@@ -380,51 +433,56 @@ class class_TimeDate                             // класс Даты и Вр�
         yield();
       #endif
 
-      _UTC_time = time(nullptr);
-      struct tm* L_tm = localtime(&_UTC_time);
-
-      String buf_Date_YEAR = String(L_tm->tm_year + 1900);
-      String buf_Date_MONTH = String(L_tm->tm_mon + 1);
-      String buf_Date_DAY = String(L_tm->tm_mday);
-      String buf_Time_HOUR = String(L_tm->tm_hour);
-      String buf_Time_MIN = String(L_tm->tm_min);
-      String buf_Time_SEC = String(L_tm->tm_sec);
-
-      _TimeHOUR = buf_Time_HOUR.toInt();
-      _TimeMIN = buf_Time_MIN.toInt();
-      _TimeSEC = buf_Time_SEC.toInt();
-
-      if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
+      if(millis() - _millis_timer_for_update > 200)   // чтобы не обновлять время чаще чем раз в 200мс //
       {
-        buf_Date_MONTH = String("0" + buf_Date_MONTH);
-      }
+        _UTC_time = time(nullptr);
+        struct tm* L_tm = localtime(&_UTC_time);
 
-      if (buf_Date_DAY.toInt() >= 0 && buf_Date_DAY.toInt() < 10)
-      {
-        buf_Date_DAY = String("0" + buf_Date_DAY);
-      }
+        String buf_Date_YEAR = String(L_tm->tm_year + 1900);
+        String buf_Date_MONTH = String(L_tm->tm_mon + 1);
+        String buf_Date_DAY = String(L_tm->tm_mday);
+        String buf_Time_HOUR = String(L_tm->tm_hour);
+        String buf_Time_MIN = String(L_tm->tm_min);
+        String buf_Time_SEC = String(L_tm->tm_sec);
 
-      if (buf_Time_HOUR.toInt() >= 0 && buf_Time_HOUR.toInt() < 10)
-      {
-        buf_Time_HOUR = String("0" + buf_Time_HOUR);
-      }
+        _TimeHOUR = buf_Time_HOUR.toInt();
+        _TimeMIN = buf_Time_MIN.toInt();
+        _TimeSEC = buf_Time_SEC.toInt();
 
-      if (buf_Time_MIN.toInt() >= 0 && buf_Time_MIN.toInt() < 10)
-      {
-        buf_Time_MIN = String ("0" + buf_Time_MIN);
-      }
+        if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
+        {
+          buf_Date_MONTH = String("0" + buf_Date_MONTH);
+        }
 
-      if (buf_Time_SEC.toInt() >= 0 && buf_Time_SEC.toInt() < 10)
-      {
-        buf_Time_SEC = String ("0" + buf_Time_SEC);
-      }
+        if (buf_Date_DAY.toInt() >= 0 && buf_Date_DAY.toInt() < 10)
+        {
+          buf_Date_DAY = String("0" + buf_Date_DAY);
+        }
 
-      _DateMONTH = buf_Date_MONTH.toInt();
-      _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
-      _TimeA = String(buf_Time_HOUR + ":" + buf_Time_MIN + ":" + buf_Time_SEC);
-      String buf_TimeB = String(buf_Time_HOUR + buf_Time_MIN + buf_Time_SEC);
-      _TimeB = buf_TimeB.toInt();
-      _DateTimeFULL = String(_DateFULL + " " + _TimeA);
+        if (buf_Time_HOUR.toInt() >= 0 && buf_Time_HOUR.toInt() < 10)
+        {
+          buf_Time_HOUR = String("0" + buf_Time_HOUR);
+        }
+
+        if (buf_Time_MIN.toInt() >= 0 && buf_Time_MIN.toInt() < 10)
+        {
+          buf_Time_MIN = String ("0" + buf_Time_MIN);
+        }
+
+        if (buf_Time_SEC.toInt() >= 0 && buf_Time_SEC.toInt() < 10)
+        {
+          buf_Time_SEC = String ("0" + buf_Time_SEC);
+        }
+
+        _DateMONTH = buf_Date_MONTH.toInt();
+        _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
+        _TimeA = String(buf_Time_HOUR + ":" + buf_Time_MIN + ":" + buf_Time_SEC);
+        String buf_TimeB = String(buf_Time_HOUR + buf_Time_MIN + buf_Time_SEC);
+        _TimeB = buf_TimeB.toInt();
+        _DateTimeFULL = String(_DateFULL + " " + _TimeA);
+
+        _millis_timer_for_update = millis();
+      }
     }
 
     void set_UTC_time()
@@ -492,7 +550,7 @@ class class_TimeDate                             // класс Даты и Вр�
     time_t _UTC_time;                            // Время в секундах //
     bool _flag_every_minute_timer = false;       // Флаг для таймера каждую четную/нечетную минуту // true - четная // false - нечетная //
 
-
+    unsigned long _millis_timer_for_update;
     byte _TimeHOUR;                              // часы //
     byte _TimeMIN;                               // минуты //
     byte _TimeSEC;                               // секунды //
@@ -561,6 +619,7 @@ unsigned int loop_time_in_millis_min;
 unsigned int loop_time_in_millis_max;
 
 unsigned int loop_messege_millis_time;
+unsigned long debug_time_start;
 
 bool loop_time_in_millis_is_it_first = true;
 
@@ -578,11 +637,13 @@ void debug(bool can_i_send_message_flag)
       loop_time_in_millis_max = 0;
       loop_time_in_millis_sum_for_avg = 0;
       loop_counter_for_avg = 0;
+      debug_time_start = millis();
     }
 
     else
     {
       unsigned long buf_timer = millis() - loop_time_in_millis_counter;
+      unsigned long debug_elapsed_time = millis() - debug_time_start;
       loop_time_in_millis_counter = millis();
 
       if(loop_time_in_millis_min > buf_timer)
@@ -598,12 +659,16 @@ void debug(bool can_i_send_message_flag)
       loop_time_in_millis_sum_for_avg += buf_timer;
       loop_counter_for_avg++;
 
-      if (can_i_send_message_flag == true && loop_counter_for_avg != 0)           // на всякий случай исключить деление на 0 // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд). //
+      if (can_i_send_message_flag == true && loop_counter_for_avg != 0 && debug_elapsed_time > 5)           // на всякий случай исключить деление на 0 // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд). //
       {
-        unsigned int loop_time_in_millis_avg = loop_time_in_millis_sum_for_avg / loop_counter_for_avg;
-
-        String buf_message  = "Количество циклов: "   + String(loop_counter_for_avg)    + "\n\n"                                      +\
-                              "Время отправки предыдущего debug сообщения: " + String(loop_messege_millis_time) + " миллисекунд.\n"   +\
+        unsigned int debug_elapsed_time_in_sec = debug_elapsed_time / 1000;
+        unsigned int loops_per_second          = loop_counter_for_avg / debug_elapsed_time_in_sec;
+        unsigned int loop_time_in_millis_avg   = loop_time_in_millis_sum_for_avg / loop_counter_for_avg;
+        
+        String buf_message  = "Прошло времени:    "    + String(debug_elapsed_time_in_sec)                      + " секунд.\n"        +\
+                              "Количество циклов: "    + String(loop_counter_for_avg)                           + "\n"                +\
+                              "Циклов в секунду:  "    + String(loops_per_second)                               + "\n\n"              +\
+                              "Время отправки предыдущего debug сообщения: " + String(loop_messege_millis_time) + " миллисекунд.\n\n" +\
                               "Время лупов без учёта отправки debug сообщения:\n"                                                     +\
                               "min: "               + String(loop_time_in_millis_min) + " миллисекунд.\n"                             +\
                               "avg: "               + String(loop_time_in_millis_avg) + " миллисекунд.\n"                             +\

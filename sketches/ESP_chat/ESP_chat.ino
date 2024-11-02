@@ -4,7 +4,7 @@
 
 #define THIS_IS_CHAT_CODE
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_005\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_006\Common_CODE.cpp"
 
 ///↓↓↓ ОТЛАДКА ↓↓↓///
 
@@ -984,7 +984,7 @@ void setup()                                     // стандартная фу�
   */
 
   Serial.begin(115200);                          // запускаем Serial Port и определяем его скорость //
-  Serial.setTimeout(300);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
+  //Serial.setTimeout(300);                        // таймаут для .readString (ждет заданное значение на чтение Serial)
 
   WiFi.setOutputPower(16.00);                    // "When values higher than 19.25 are set, the board resets every time a connection with the AP is established." // https://stackoverflow.com/questions/75712199/esp8266-watchdog-reset-when-using-wifi // 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);          // подключаемся к Wi-Fi //
@@ -1031,7 +1031,6 @@ void loop()                                      // основной луп //
 
   close_air_dumpers_fast();                                                         // меняем быстро положение заслонок, если включили режим рекуперации //
 
-  delay(10);                                                                        // delay работает лучше, чем миллис конкретно здесь! // нужно, чтобы не подглючивал .tick из-за слишком частых опросов //
   bot_tick_and_call_debug();                                                        // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
 
   if(object_TimeDate.get_MIN() % 2 > 0 && flag_every_minute_timer == false)         // таймер каждую нечетную минуту //
@@ -1655,33 +1654,36 @@ void humidifier()                                // увлажнитель //
 
 void recuperator_button_check(bool send_message_anyway)
 {
-  #ifdef Jesse_yield_enable
-    yield();
-  #endif
+  static unsigned long millis_timer_button_check;
 
-  if(analogRead(recuperator_button) > 975)       // Режим - ЗАСЛОНКИ
+  if(millis() - millis_timer_button_check > 100)
   {
-    if(use_recuperator == true || send_message_anyway == true)
+    if(analogRead(recuperator_button) > 975)       // Режим - ЗАСЛОНКИ
     {
-      String recuperator_info_message_2  = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
-             recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
+      if(use_recuperator == true || send_message_anyway == true)
+      {
+        String recuperator_info_message_2  = "\n\n*В режиме Заслонки стоит выставить скорость приточного вентилятора 4 или 5.";
+              recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
 
-      use_recuperator = false;
-      send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);      
+        use_recuperator = false;
+        send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);      
+      }
     }
-  }
 
-  if(analogRead(recuperator_button) < 50)        // Режим - РЕКУПЕРАТОР
-  {
-    if(use_recuperator == false || send_message_anyway == true)
+    else if(analogRead(recuperator_button) < 50)        // Режим - РЕКУПЕРАТОР
     {
-    String recuperator_info_message  = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха,";
-           recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.";
-           recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
+      if(use_recuperator == false || send_message_anyway == true)
+      {
+      String recuperator_info_message  = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха,";
+            recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.";
+            recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
 
-    use_recuperator = true;
-    send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
+      use_recuperator = true;
+      send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
+      }
     }
+
+    millis_timer_button_check = millis();
   }
 }
 
@@ -1734,7 +1736,7 @@ void SYNCstart()                                 // Отправка темпе�
 
   global_ERROR_flag = false;
   
-  if (Serial.available())                  // Проверка что вообще что-то пришло //
+  if (Serial.available())                                                 // если что-то есть в серил, то читаем //
   {
     #ifdef Jesse_yield_enable
       yield();
