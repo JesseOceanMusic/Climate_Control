@@ -4,8 +4,9 @@
 
 #define THIS_IS_LOGGER_CODE
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
+//#define FB_USE_LOG Serial
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_007\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_008\Common_CODE.cpp"
 
 /// ↓↓↓ SD карта
 
@@ -1392,17 +1393,7 @@
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
-          debug_flag = !debug_flag;
-          loop_time_in_millis_is_it_first = true;
-
-          if(debug_flag == true)
-          {
-            object_array_users[users_array_index].send_message("Отправка дебаг-сообщений включена.");
-          }
-          else
-          {
-            object_array_users[users_array_index].send_message("Отправка дебаг-сообщений отключена.");
-          }
+          obj_debug_jesse.my_switch();
         }
         break;
       }
@@ -1493,6 +1484,8 @@
 
   void loop()                                      // основной луп //
   {
+    unsigned long local_timestamp_ms = millis();                                 // для подсчета времени лупа //
+
     object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
   
     object_NightTime.update_NightTime();                                         // обновляем состояние ночного режима //
@@ -1527,6 +1520,8 @@
       restart_check();
       flag_every_minute_timer = false;
     }
+
+    obj_debug_jesse.loop_length_ms = millis() - local_timestamp_ms;
   }
 
 

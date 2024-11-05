@@ -201,7 +201,7 @@
       echo_supervision += ":\n\n";
       echo_supervision += input;
       object_array_users[0].send_message(echo_supervision);
-    }
+    }  
   }
 
   bool class_users::check_id(String CHAT_IDcur, String income_message)
@@ -256,7 +256,7 @@
     if(can_i_send_message_flag == true && buf_alert_message.length() > 2)
     {
       for(int i = 0; i < user_array_length; i++)
-      {
+      {  
         object_array_users[i].send_alert_from_buf_alert_message();
       }
       buf_alert_message = "";
@@ -360,50 +360,188 @@
     }
   }
 
+  #define bot_main_poll_period 27000
+                            // ↑↑   13/17/23/27/33/37 секунды, чтобы максимально редко было совпадение с моими циклами раз в 60 секунд //
+                            // уведомления (send_alert) и дебаг-сообщения отправляются только между этими периодами, то есть раз в 13/17/23 секунды //
+  #define bot_both_time_out 60000
+          // .setTimeout это не время ожидания ответа от сервера внутри одного .tick //
+          // это время ожидания ответа после окончания bot_main_poll_period //
+          // то есть, если последнее сообщение было 17 секунд назад (bot_main_poll_period) и плюс прошло еще 8 секунд (bot_both_time_out) //
+          // то библиотека разорвет соединение и заного его создаст. Это займет 1-2 секунды. //
+          // при этом этот таймаут (bot_both_time_out) программа не будет заблокированна //
+          // она всё так же будет вызывать .tick каждый луп и ждать соединения //
+          // !!!не должно быть меньше 1000!!! // https://core.telegram.org/bots/api // Timeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only. //
+
   void setup_telegram_bots()                       // настройки телеграм ботов //
   {
-    bot_main.setToken(F(bot_main_Token));                    // установить токен
-    bot_main.attachUpdate(Message_from_Telegram_converter);  // подключить обработчик обновлений
-    bot_main.setPollMode(fb::Poll::Long, 20000);
-                                //Sync   синхронный               (рекомендуемый период > 3500 мс)
-                                //Async  асинхронный              (рекомендуемый период > 3500 мс)
-                                //Long   асинхронный long polling (рекомендуемый период > 20000 мс) // Самый быстрый... //
-    
-    bot_main.setMemLimit(6000);                             // установить лимит памяти на ответ сервера (библиотека начнёт пропускать сообщения), умолч. 20.000
-    bot_main.setLimit(1);                                    // установить лимит - кол-во сообщений в одном обновлении (умолч. 3)
-    bot_main.setTimeout(600);                               // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
-
-    bot_second.setToken(F(bot_second_Token));                // установить токен
-    bot_second.setPollMode(fb::Poll::Async, 4000);
+    // Main bot
+      bot_main.setToken(F(bot_main_Token));                          // установить токен
+      bot_main.attachUpdate(Message_from_Telegram_converter);        // подключить обработчик обновлений
+      bot_main.setPollMode(fb::Poll::Long, bot_main_poll_period);
                                   //Sync   синхронный               (рекомендуемый период > 3500 мс)
                                   //Async  асинхронный              (рекомендуемый период > 3500 мс)
-                                  //Long   асинхронный long polling (рекомендуемый период > 20000 мс) // Самый быстрый... //  
-    bot_second.setTimeout(2000);                             // установить таймаут ожидания ответа сервера (умолч. 2000 мс)  
+                                  //Long   асинхронный long polling (рекомендуемый период > 20000 мс) // Самый быстрый... //
+    
+      bot_main.setMemLimit(120);                                     // установить лимит памяти на ответ сервера (библиотека начнёт пропускать сообщения), умолч. 20.000
+      bot_main.setLimit(1);                                          // установить лимит - кол-во сообщений в одном обновлении (умолч. 3)
+      bot_main.setTimeout(bot_both_time_out);                        // установить таймаут ожидания ответа сервера (умолч. 2000 мс)
+
+      bot_main.updates.clearAll();
+      bot_main.updates.set(fb::Updates::Type::Message | fb::Updates::Type::InlineQuery | fb::Updates::Type::CallbackQuery);
+
+    // Second bot
+      bot_second.setToken(F(bot_second_Token));              // установить токен
+      bot_second.setPollMode(fb::Poll::Async, bot_main_poll_period);
+                                     //Sync   синхронный               (рекомендуемый период > 3500 мс)
+                                     //Async  асинхронный              (рекомендуемый период > 3500 мс)
+                                     //Long   асинхронный long polling (рекомендуемый период > 20000 мс) // Самый быстрый... //  
+      bot_second.setTimeout(bot_both_time_out);                            // установить таймаут ожидания ответа сервера (умолч. 2000 мс)  
+      bot_second.updates.clearAll();
   }
 
-  void debug(bool can_i_send_message_flag);    // прототип функции //
+/// ↓↓↓ Debug 
+
+  ;
+
+  class class_debug_jesse
+  {
+    public:
+      unsigned long loop_length_ms;
+      unsigned long tick_max_length_ms;
+      unsigned long send_alert_max_length_ms;
+      unsigned int tick_above_900_counter;
+
+      class_debug_jesse()
+      {
+      }
+
+      void my_switch()                              // вкл/выкл дебага
+      {
+        _debug_enable_flag = !_debug_enable_flag;
+
+        String buf_msg  = "Отправка дебаг-сообщений ";
+               buf_msg += (_debug_enable_flag ? "включена." : "отключена.");
+                          // тернарный оператор
+                          // если _debug_enable_flag == true, то " включена"
+                          // если _debug_enable_flag == false, то " отключена"
+        object_array_users[0].send_message(buf_msg);
+      }
+
+      bool tick(bool can_i_send_message_flag)
+      {
+        if(_loop_max_length_ms < loop_length_ms)
+        {
+          _loop_max_length_ms = loop_length_ms;
+        }
+
+        if(esp_lowest_heap < ESP.getFreeHeap())
+        {
+          esp_lowest_heap = ESP.getFreeHeap();
+        }
+
+        _debug_loop_counter++;
+
+        if(_debug_enable_flag == true)
+        {   
+          unsigned long debug_elapsed_time_in_ms = millis() - _debug_time_start;
+
+          if (can_i_send_message_flag == true && _debug_loop_counter != 0 && debug_elapsed_time_in_ms > (debug_send_msg_period_ms))         // на всякий случай исключить деление на 0 // будет срабатывать каждые цикл с задержкой указанной в .setPollMode (раз в 20 секунд). или по таймеру debug_elapsed_time_in_ms //
+          {
+            unsigned int debug_elapsed_time_in_sec = debug_elapsed_time_in_ms / 1000;
+            float avg_loop_length = (float)debug_elapsed_time_in_ms / (float)_debug_loop_counter;
+            unsigned int loops_per_second = 0;
+            if(debug_elapsed_time_in_sec != 0)
+            {
+              loops_per_second = _debug_loop_counter / debug_elapsed_time_in_sec;
+            }
+            
+            String buf_message  = "Прошло времени: "              + String(debug_elapsed_time_in_sec) + " sec.\n"    +\
+                                  "Количество циклов: "           + String(_debug_loop_counter)        + "\n"        +\
+                                  "Циклов в секунду: "            + String(loops_per_second)          + "\n\n"       +\
+                                  "max loop length: "             + String(_loop_max_length_ms)        + " ms.\n"    +\
+                                  "avg loop length: "             + String(avg_loop_length)             + " ms.\n\n" +\
+                                  "max .tick length: "            + String(tick_max_length_ms)        + " ms.\n"     +\
+                                  "above_900 .tick: "             + String(tick_above_900_counter)    + " раз\n\n"   +\
+                                  "max send_alert length: "       + String(send_alert_max_length_ms)  + " ms.\n"     +\
+                                  "last debug_send_msg length: "  + String(_send_debug_msg_length_ms)  + " ms.\n\n"  +\
+                                  "lowest ESP.getFreeHeap(): "    + String(esp_lowest_heap)           + " байт.";
+
+            unsigned long local_timestamp_in_ms = millis();
+            object_array_users[2].send_message(buf_message);
+            _send_debug_msg_length_ms = millis() - local_timestamp_in_ms;
+
+            start_over();
+            return false;
+          }
+        }
+        return true;
+      }
+    private:
+      bool          _debug_enable_flag = false;
+      unsigned int  _debug_loop_counter;
+      unsigned int  _loop_max_length_ms;
+      unsigned int  _send_debug_msg_length_ms;
+      unsigned long _debug_time_start;
+      size_t esp_lowest_heap;
+
+      const unsigned int debug_send_msg_period_ms = 1000 * 60 * 10;
+
+      void start_over()
+      {
+        esp_lowest_heap = 0;
+        send_alert_max_length_ms = 0;
+        _loop_max_length_ms = 0;
+        _debug_time_start = millis();
+        tick_max_length_ms = 0;
+        tick_above_900_counter = 0;
+        _debug_loop_counter = 0;
+      }
+  };
+
+  class_debug_jesse obj_debug_jesse;  
 
   void bot_tick_and_call_debug()               // позволяет отправить сообщение без задержки в 1-2 секунды в режиме Long. Проблема есть только если сообщение отправляется вне обработчика входящий сообщений. // https://github.com/GyverLibs/FastBot2/blob/main/docs/3.start.md //
   {
+    unsigned long local_timestamp_ms = millis();
     jesse_yield_func();
 
     static unsigned long millis_timer_for_tick;
-
     bool can_i_send_message_flag = false;
+    unsigned long local_timestamp_in_ms = millis();
 
-    if(millis() - millis_timer_for_tick > 30)
+    if(millis() - millis_timer_for_tick > 5)
     {
-      if(bot_main.tick() == true && bot_main.isPolling() == false)    // будет срабатывать каждые цикл со задержкой указанной в .setPollMode (раз в 20 секунд).
+      if(bot_main.tick() == true)
       {
-        can_i_send_message_flag = true;
+        if(bot_main.isPolling() == false)
+        {
+          can_i_send_message_flag = true;
+        }
       }
-
       millis_timer_for_tick = millis();
-    }  
+    }
 
-    
+    if(millis() - local_timestamp_in_ms > obj_debug_jesse.tick_max_length_ms)
+    {
+      obj_debug_jesse.tick_max_length_ms = millis() - local_timestamp_in_ms;
+    }
+
+    if (millis() - local_timestamp_in_ms > 900)
+    {
+      obj_debug_jesse.tick_above_900_counter++;
+    }
+
+    if(obj_debug_jesse.tick(can_i_send_message_flag) == false)
+    {
+      can_i_send_message_flag = false;
+    }
+
+    local_timestamp_in_ms = millis();
     is_there_an_alert_to_send(can_i_send_message_flag);
-    debug(can_i_send_message_flag);
+    if(millis() - local_timestamp_in_ms > obj_debug_jesse.send_alert_max_length_ms)
+    {
+      obj_debug_jesse.send_alert_max_length_ms = millis() - local_timestamp_in_ms;
+    }
   }
 
 /// ↓↓↓ Время
@@ -591,83 +729,3 @@
     send_alert(buf_message);
   }
 
-/// ↓↓↓ Debug 
-
-  bool debug_flag = false;
-
-  unsigned long loop_time_in_millis_counter;
-
-  unsigned int loop_time_in_millis_sum_for_avg;
-  unsigned int loop_counter_for_avg;
-
-  unsigned int loop_time_in_millis_min;
-  unsigned int loop_time_in_millis_max;
-
-  unsigned int loop_messege_millis_time;
-  unsigned long debug_time_start;
-
-  bool loop_time_in_millis_is_it_first = true;
-
-  void debug(bool can_i_send_message_flag)
-  {
-    if(debug_flag == true)
-    {
-      if(loop_time_in_millis_is_it_first == true)
-      {
-        loop_messege_millis_time = millis() - loop_time_in_millis_counter;       // записываем время которое ушло на отправку сообщения
-        loop_time_in_millis_counter = millis();                                  // обнуляем счетчик, чтобы не учитывать отправку сообщения в счётчике и при первом запуске debug - не было неправильного значения
-        loop_time_in_millis_is_it_first = false;
-
-        loop_time_in_millis_min = 999999;
-        loop_time_in_millis_max = 0;
-        loop_time_in_millis_sum_for_avg = 0;
-        loop_counter_for_avg = 0;
-        debug_time_start = millis();
-      }
-
-      else
-      {
-        unsigned long buf_timer = millis() - loop_time_in_millis_counter;
-        unsigned long debug_elapsed_time = millis() - debug_time_start;
-        loop_time_in_millis_counter = millis();
-
-        if(loop_time_in_millis_min > buf_timer)
-        {
-          loop_time_in_millis_min = buf_timer;
-        }
-
-        if(loop_time_in_millis_max < buf_timer)
-        {
-          loop_time_in_millis_max = buf_timer;
-        }
-        
-        loop_time_in_millis_sum_for_avg += buf_timer;
-        loop_counter_for_avg++;
-
-        if (can_i_send_message_flag == true && loop_counter_for_avg != 0 && debug_elapsed_time > (1000 * 60 * 5))         // на всякий случай исключить деление на 0 // будет срабатывать каждые цикл с задержкой указанной в .setPollMode (раз в 20 секунд). или по таймеру debug_elapsed_time //
-        {
-          unsigned int debug_elapsed_time_in_sec = debug_elapsed_time / 1000;
-          unsigned int loop_time_in_millis_avg   = loop_time_in_millis_sum_for_avg / loop_counter_for_avg;
-          unsigned int loops_per_second = 0;
-          if(debug_elapsed_time_in_sec != 0)
-          {
-            loops_per_second = loop_counter_for_avg / debug_elapsed_time_in_sec;
-          }
-          
-          String buf_message  = "Прошло времени: "       + String(debug_elapsed_time_in_sec)                      + " секунд.\n"        +\
-                                "Количество циклов: "    + String(loop_counter_for_avg)                           + "\n"                +\
-                                "Циклов в секунду: "     + String(loops_per_second)                               + "\n\n"              +\
-                                "Время отправки предыдущего debug сообщения: " + String(loop_messege_millis_time) + " миллисекунд.\n\n" +\
-                                "Время лупов без учёта отправки debug сообщения:\n"                                                     +\
-                                "min: "               + String(loop_time_in_millis_min) + " миллисекунд.\n"                             +\
-                                "avg: "               + String(loop_time_in_millis_avg) + " миллисекунд.\n"                             +\
-                                "max: "               + String(loop_time_in_millis_max) + " миллисекунд.\n\n"                           +\
-                                "ESP.getFreeHeap(): " + String(ESP.getFreeHeap())       + " байт.";
-
-          object_array_users[2].send_message(buf_message);
-
-          loop_time_in_millis_is_it_first = true;
-        }
-      }
-    }
-  }
