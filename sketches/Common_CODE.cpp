@@ -48,7 +48,7 @@
           }
           else
           {
-            float avg = (float)loop_length_sum_for_avg / (float)_iteretion_counter;
+            float avg = (float)_loop_length_sum_for_avg / (float)_iteretion_counter;
             return avg;
           }
         }
@@ -75,7 +75,7 @@
         if(_count_above_limit == true)
         {
           buf_info += "\n";
-          for (int i = 0; i < _array_length; i++)
+          for (int i = 0; i < _high_limit_array_length; i++)
           {
             buf_info += "above" + String(_high_limit_array[i]) + ": ";
             buf_info += String(_high_limit_counter_array[i]) + "\n";
@@ -96,7 +96,11 @@
         _low = 999999;
         _max = 0;
         _iteretion_counter = 0;
-
+        _loop_length_sum_for_avg = 0;
+        for(int i = 0; i < _high_limit_array_length; i++)
+        {
+          _high_limit_counter_array [i] = 0;
+        }
         _start_timestamp = millis();
       }
 
@@ -115,10 +119,10 @@
 
       bool _calculate_avg_flag;
       unsigned int _iteretion_counter = 0;
-      unsigned int loop_length_sum_for_avg;
+      unsigned int _loop_length_sum_for_avg;
 
       bool _count_above_limit;
-      const byte _array_length = 11;
+      const byte _high_limit_array_length = 11;
       const unsigned int _high_limit_array [11] = {50, 100, 150, 200, 300, 400, 500, 700, 700, 1100, 1300, };
       unsigned int _high_limit_counter_array [11];
 
@@ -151,7 +155,7 @@
           _iteretion_counter++;
           if(_is_it_loop == false)
           {
-            loop_length_sum_for_avg += (millis() - _last_timestamp);
+            _loop_length_sum_for_avg += (millis() - _last_timestamp);
           }
         }
       }
@@ -159,7 +163,7 @@
       void f_check_high_limit()
       {
         const unsigned int elapsed_time = millis() - _last_timestamp;
-        for (int i = 0; i < _array_length; i++)
+        for (int i = 0; i < _high_limit_array_length; i++)
         {
           if(elapsed_time > _high_limit_array[i])
           {
@@ -170,28 +174,12 @@
   };
 
   cl_stopwatch_ms obj_stopwatch_ms_loop       ("LOOP",       false, true, true, true,  true);
-  cl_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",      false, true, false, true, false);
+  cl_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",       false, true, false, true, false);
 
 /// ↓↓↓ Телеграм
 
   #include <FastBot2.h>
   #include "Sensetive_INFO.cpp"                    // логины/пароли/токены/id //
-  /*
-    WIFI_SSID
-    WIFI_PASSWORD
-    BOT_TOKEN1
-    BOT_TOKEN2
-    BOT_TOKEN3
-    BOT_TOKEN4
-    USER_ID0
-    USER_ID1
-    USER_ID2
-    USER_ID3
-    USER_ID4
-    USER_ID5
-    USER_ID6
-  */
-
 
   #ifdef THIS_IS_CHAT_CODE
     FastBot2 bot_main;                             // BOT "Chat" //
@@ -334,7 +322,7 @@
       {
         if(_admin_flag == false) 
         {
-          byte meme_index = random(0,   (memes_amount + 1));
+          byte meme_index = random(0, memes_amount);
             //                     min: нижняя граница случайных значений, включительно. (опционально)
             //                           max: верхняя граница случайных значений, не включительно.
 
@@ -363,16 +351,6 @@
       unsigned int _MessageState;                            // стейт сообщений //
   };
 
-  class_users object_array_users[user_array_length] =
-  {
-    class_users(0, USER_ID0_me,            true,  true,  false, false, "Андрей"),                             // Мой айди //
-    class_users(1, USER_ID1_guest,         false, false, true,  false, "Гостевой чат"),                       // гостевой юзер //  
-    class_users(2, USER_ID2_debug,         false, false, false, true,  "Debug"),                              // Группа для дебаг-сообщений //  
-    class_users(3, USER_ID3_Kate_group,    false, false, false, false, "Катя - группа"),                      // Катя - айди группы //
-    class_users(4, USER_ID4_Kate_personal, false, false, true,  false, "Катя - личная переписка"),            // Катя - личный айди //
-    class_users(5, USER_ID5_Sasha_group,   false, false, false, false, "Саша - группа"),                      // Саша - айди группы //
-    class_users(6, USER_ID6_Slava_Artem,   false, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
-  };
   namespace USERS
   {
     enum
@@ -386,6 +364,18 @@
       SLAVA_ARTEM_GROUP = 6,
     };
   }
+
+  class_users object_array_users[user_array_length] =
+  {
+    class_users(USERS::ME,                USER_ID0_me,            true,  true,  false, false, "Андрей"),                             // Мой айди //
+    class_users(USERS::GUEST,             USER_ID1_guest,         false, false, true,  false, "Гостевой чат"),                       // гостевой юзер //  
+    class_users(USERS::DEBUG,             USER_ID2_debug,         false, false, false, true,  "Debug"),                              // Группа для дебаг-сообщений //  
+    class_users(USERS::KATE_GROUP,        USER_ID3_Kate_group,    false, false, false, false, "Катя - группа"),                      // Катя - айди группы //
+    class_users(USERS::KATE_PERSONAL,     USER_ID4_Kate_personal, false, false, true,  false, "Катя - личная переписка"),            // Катя - личный айди //
+    class_users(USERS::SASHA_GROUP,       USER_ID5_Sasha_group,   false, false, false, false, "Саша - группа"),                      // Саша - айди группы //
+    class_users(USERS::SLAVA_ARTEM_GROUP, USER_ID6_Slava_Artem,   false, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
+  };
+
 
   void class_users::send_message(String input)
   {
@@ -421,7 +411,7 @@
     return(false);
   }
 
-  void send_alert(String input_message)            // функция для отправки уведомлений пользователям, которые на них подписаны //
+  void send_alert(String input_message)                    // функция для отправки уведомлений пользователям, которые на них подписаны //
   {
     if(global_buf_alert_msg.length() < 800)
     {
@@ -493,11 +483,11 @@
     return(false);
   }
 
-  void Message_command_get_data(String text);      // прототип функции //
+  void Message_command_get_data(String text);              // прототип функции //
 
-  void Message_command_send_data(int text_int);    // прототип функции //
+  void Message_command_send_data(int text_int);            // прототип функции //
 
-  bool Message_is_it_back_command(String text)     // проверяет является ли текст пришедший из телеграма "/back" //
+  bool Message_is_it_back_command(String text)             // проверяет является ли текст пришедший из телеграма "/back" //
   {
     jesse_yield_func();
 
@@ -519,7 +509,7 @@
     return(false);
   }
 
-  void Message_from_Telegram_converter(fb::Update& u)           // преобразование сообщение из Телеграм в команду //
+  void Message_from_Telegram_converter(fb::Update& u)      // преобразование сообщение из Телеграм в команду //
   {
     jesse_yield_func();
 
@@ -578,7 +568,7 @@
           // она всё так же будет вызывать .tick каждый луп и ждать соединения //
           // !!!не должно быть меньше 1000!!! // https://core.telegram.org/bots/api // Timeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only. //
 
-  void setup_telegram_bots()                       // настройки телеграм ботов //
+  void setup_telegram_bots()                               // настройки телеграм ботов //
   {
     // Main bot
       bot_main.setToken(F(bot_main_Token));                          // установить токен
@@ -605,9 +595,9 @@
       bot_second.updates.clearAll();
   }
 
-  void check_timer_for_sending_debug_report();  // прототип функции
+  void check_timer_for_sending_debug_report();             // прототип функции
 
-  void bot_tick_and_call_debug()               // позволяет отправить сообщение без задержки в 1-2 секунды в режиме Long. Проблема есть только если сообщение отправляется вне обработчика входящий сообщений. // https://github.com/GyverLibs/FastBot2/blob/main/docs/3.start.md //
+  void bot_tick_and_call_debug()                           // позволяет отправить сообщение без задержки в 1-2 секунды в режиме Long. Проблема есть только если сообщение отправляется вне обработчика входящий сообщений. // https://github.com/GyverLibs/FastBot2/blob/main/docs/3.start.md //
   {
     jesse_yield_func();
 
@@ -634,7 +624,7 @@
 
 /// ↓↓↓ Время
 
-  class class_TimeDate                             // класс Даты и Времени //
+  class class_TimeDate                                     // класс Даты и Времени //
   {
     public:
       class_TimeDate()                             // конструктор класса //
@@ -776,15 +766,15 @@
       long _TimeB;                                 //время в формате 220102 //
   };
 
-  class_TimeDate object_TimeDate;                  // создаем экземпляр класса class_TimeDate (объект) //
+  class_TimeDate object_TimeDate;                          // создаем экземпляр класса class_TimeDate (объект) //
 
-  bool flag_every_minute_timer = false;            // флаг для таймера каждую четную/нечетную минуту //   
+  bool flag_every_minute_timer = false;                    // флаг для таймера каждую четную/нечетную минуту //   
 
 /// ↓↓↓ Restart
 
   bool esp_restart_flag = false;
 
-  void restart_check()                             // реализация перезагрузки из команды в телеграме //
+  void restart_check()                                     // реализация перезагрузки из команды в телеграме //
   {
     jesse_yield_func();
 
@@ -806,7 +796,7 @@
 
 /// ↓↓↓ Причина перезагрузки
 
-  void send_reset_info()                           // отчёт о причине перезагрузки //
+  void send_reset_info()                                   // отчёт о причине перезагрузки //
   {
     String Jesse_reset_reason = ESP.getResetReason();
     String Jesse_reset_info = ESP.getResetInfo();

@@ -8,108 +8,7 @@
 
 #include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_009\Common_CODE.cpp"
 
-/// ↓↓↓ SD карта
-
-  #include <SPI.h>                                 // библиотека для SD карты //   
-  #include <SD.h>                                  // ↑↑↑ //  
-
-  String SYNCdata;                                 // стринг для полученных данных из Serial Port //
-
-  void LOG_write_sync_data()                       // запись лога //
-  {
-    if (!SD.begin(4))
-    {
-      send_alert("ERROR: Ошибка инициализации SD карты");
-    }
-
-    jesse_yield_func();
-
-    File myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt", FILE_WRITE);
-
-    if (myFile)
-    {
-      myFile.println(object_TimeDate.get_DateTimeFULL() + "," + SYNCdata);
-      myFile.close();
-    }
-
-    else
-    {
-      send_alert("ERROR: Ошибка записи на SD карту");
-    }
-  }
-
-  void LOG_send_by_timer()                        // отправка лога в 23:45 //
-  {
-    static bool flag_every_day_log_timer;                                                   // флаг для отправки лога раз в сутки //
-    if (flag_every_day_log_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
-    {
-      if (!SD.begin(4))
-      {
-        send_alert("ERROR: Ошибка инициализации SD карты");
-      }
-
-      String file_name = object_TimeDate.get_DateFULL() + ".txt";
-      String buf_user_ID = object_array_users[0].get_id();
-      jesse_yield_func();
-      File myFile = SD.open(file_name);
-
-      if (myFile)
-      {
-        fb::File f(file_name, fb::File::Type::document, myFile);
-        f.chatID = buf_user_ID;
-
-        jesse_yield_func();
-
-        bot_second.sendFile(f, false);
-
-        myFile.close();
-      }
-
-      else
-      {
-        send_alert("ERROR: Create or open .txt FAILED");
-      }
-      flag_every_day_log_timer = true;
-    }
-
-
-    if (flag_every_day_log_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы лог отправился на следующий день // 
-    {    
-      flag_every_day_log_timer = false;
-    }
-  }
-
-  void LOG_send_by_command()                      // отправка лога по команде //
-  {
-    if (!SD.begin(4))
-    {
-      send_alert("ERROR: Ошибка инициализации SD карты");
-    }
-  
-    String file_name = object_TimeDate.get_DateFULL() + ".txt";
-    String buf_user_ID = object_array_users[users_array_index].get_id();
-    jesse_yield_func();
-    File myFile = SD.open(file_name);
-
-    if (myFile)
-    {
-      fb::File f(file_name, fb::File::Type::document, myFile);
-      f.chatID = buf_user_ID;
-
-      bot_main.sendMessage(fb::Message("Ожидайте...\nОтправляю файл: " + file_name, object_array_users[users_array_index].get_id()));
-      delay(20);
-      bot_main.sendFile(f, false);
-      delay(20);
-      bot_main.sendMessage(fb::Message("Отправка файла завершена.", object_array_users[users_array_index].get_id())); 
-
-      myFile.close();
-    }
-
-    else
-    {
-      send_alert("ERROR: Ошибка чтения SD карты");
-    }
-  }  
+String SYNCdata;                                 // стринг для полученных данных из Serial Port //
 
 /// ↓↓↓ Адресная лента бра и линия
 
@@ -119,13 +18,13 @@
   #define Bra_Pin         D1                       // ↑↑↑ //
   CRGB array_LED_bra [Bra_Leds_Amount];            // ↑↑↑ //
 
-  #define Line_Leds_Amount 60                      // Полоска //   
-  #define Line_Pin         D2                      // ↑↑↑ //
-  CRGB array_LED_line [Line_Leds_Amount];          // ↑↑↑ //
-
   #define Clock_Leds_Amount 191                    // Часы //   
   #define Clock_Pin         D4                     // ↑↑↑ //
   CRGB array_LED_clock [Clock_Leds_Amount];        // ↑↑↑ //
+
+  #define Line_Leds_Amount 60                      // Полоска //   
+  #define Line_Pin         D2                      // ↑↑↑ //
+  CRGB array_LED_line [Line_Leds_Amount];          // ↑↑↑ //
 
   byte depth;
 
@@ -540,7 +439,7 @@
       {
         if(_NightTimeState <= NightTime::State::NEUTRAL)                       // Ночной режим ВКЛ с 21:00 до 6:48 //
         { 
-          if (object_TimeDate.get_TimeB() > 210000 || object_TimeDate.get_TimeB() < 64800)
+          if (object_TimeDate.get_TimeB() > 210000 || object_TimeDate.get_TimeB() < 84800)
           {
             _NightTimeDimState = NightTime::DimState::DECREASE;     // Уменьшение яркости (займет 10 минут при стандартной яркости) //
             _NightTimeState    = NightTime::State::ON;              // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
@@ -549,7 +448,7 @@
 
         if(_NightTimeState >= NightTime::State::NEUTRAL)                       // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
         {
-          if (object_TimeDate.get_TimeB() > 65000 && object_TimeDate.get_TimeB() < 205800)
+          if (object_TimeDate.get_TimeB() > 85000 && object_TimeDate.get_TimeB() < 205800)
           {    
             _NightTimeDimState = NightTime::DimState::INCREASE;     // Увеличение яркости (займет 40 минут при стандартной яркости) //
             _NightTimeState    = NightTime::State::OFF;             // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
@@ -750,7 +649,6 @@
   bool clock_night_indication_co2 = true;          // ↑↑↑ // СО2 //
   bool clock_night_indication_temperature = true;  // ↑↑↑ // температура //
   bool clock_night_indication_humidity = true;     // ↑↑↑ // влажность //
-
 
   void clock_master()                              // мастер функция для часов вызывающая другие функции и методы. //
   {
@@ -1043,6 +941,107 @@
     return(clock_indication_message);
   }
 
+/// ↓↓↓ SD карта
+
+  #include <SPI.h>                                 // библиотека для SD карты //   
+  #include <SD.h>                                  // ↑↑↑ //  
+
+  void LOG_write_sync_data()                       // запись лога //
+  {
+    if (!SD.begin(4))
+    {
+      send_alert("ERROR: Ошибка инициализации SD карты");
+    }
+
+    jesse_yield_func();
+
+    File myFile = SD.open(object_TimeDate.get_DateFULL() + ".txt", FILE_WRITE);
+
+    if (myFile)
+    {
+      myFile.println(object_TimeDate.get_DateTimeFULL() + "," + SYNCdata);
+      myFile.close();
+    }
+
+    else
+    {
+      send_alert("ERROR: Ошибка записи на SD карту");
+    }
+  }
+
+  void LOG_send_by_timer()                        // отправка лога в 23:45 //
+  {
+    static bool flag_every_day_log_timer;                                                   // флаг для отправки лога раз в сутки //
+    if (flag_every_day_log_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
+    {
+      if (!SD.begin(4))
+      {
+        send_alert("ERROR: Ошибка инициализации SD карты");
+      }
+
+      String file_name = object_TimeDate.get_DateFULL() + ".txt";
+      String buf_user_ID = object_array_users[USERS::ME].get_id();
+      jesse_yield_func();
+      File myFile = SD.open(file_name);
+
+      if (myFile)
+      {
+        fb::File f(file_name, fb::File::Type::document, myFile);
+        f.chatID = buf_user_ID;
+
+        jesse_yield_func();
+
+        bot_second.sendFile(f, false);
+
+        myFile.close();
+      }
+
+      else
+      {
+        send_alert("ERROR: Create or open .txt FAILED");
+      }
+      flag_every_day_log_timer = true;
+    }
+
+
+    if (flag_every_day_log_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы лог отправился на следующий день // 
+    {    
+      flag_every_day_log_timer = false;
+    }
+  }
+
+  void LOG_send_by_command()                      // отправка лога по команде //
+  {
+    if (!SD.begin(4))
+    {
+      send_alert("ERROR: Ошибка инициализации SD карты");
+    }
+  
+    String file_name = object_TimeDate.get_DateFULL() + ".txt";
+    String buf_user_ID = object_array_users[users_array_index].get_id();
+    jesse_yield_func();
+    File myFile = SD.open(file_name);
+
+    if (myFile)
+    {
+      fb::File f(file_name, fb::File::Type::document, myFile);
+      f.chatID = buf_user_ID;
+
+      bot_main.sendMessage(fb::Message("Ожидайте...\nОтправляю файл: " + file_name, object_array_users[users_array_index].get_id()));
+      delay(20);
+      bot_main.sendFile(f, false);
+      delay(20);
+      bot_main.sendMessage(fb::Message("Отправка файла завершена.", object_array_users[users_array_index].get_id())); 
+
+      myFile.close();
+    }
+
+    else
+    {
+      send_alert("ERROR: Ошибка чтения SD карты");
+    }
+  }
+
 /// ↓↓↓ Телеграм
 
   void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
@@ -1110,9 +1109,9 @@
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
-          object_array_users[1].set_id(text);
+          object_array_users[USERS::GUEST].set_id(text);
           object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
-          object_array_users[1].send_message("Я проснулся.");
+          object_array_users[USERS::GUEST].send_message("Я проснулся.");
         }
         break;
       }
@@ -1520,9 +1519,3 @@
 
     obj_stopwatch_ms_loop.stop();
   }
-
-
-
-
-
-

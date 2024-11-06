@@ -406,7 +406,7 @@
 
         if(motor_calibration::state == 2 && _calibrate_ERROR == false)                                                        // быстрая калибровка //
         {
-          object_array_users[0].send_message_second_chat("Начинаю процесс быстрой калибровки.");
+          object_array_users[USERS::ME].send_message_second_chat("Начинаю процесс быстрой калибровки.");
 
           if(digitalRead(pin_knob_LOW) == 1 && digitalRead(pin_knob_HIGH) == 1)
           {
@@ -428,7 +428,7 @@
               _steps_GLOBAL = street_LOWEST_position_cur;
             }
 
-            object_array_users[0].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(_steps_GLOBAL));
+            object_array_users[USERS::ME].send_message_second_chat("Быстрая калибровка выполнена.\n\nТекущее положение заслонок: " + String(_steps_GLOBAL));
           }
           
           else
@@ -440,7 +440,7 @@
 
         if(motor_calibration::state == motor_calibration::full && _calibrate_ERROR == false)                                  // полноценная калибровка //
         {
-          object_array_users[0].send_message_second_chat("Начинаю процесс полноценной калибровки.");
+          object_array_users[USERS::ME].send_message_second_chat("Начинаю процесс полноценной калибровки.");
 
           for(int i = 0; i < 2; i++)                                             // Запускаем по два раза, чтобы отступить KNOB_space*2 //
           {
@@ -461,13 +461,13 @@
           if (_calibrate_ERROR == false)
           {
             _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();  // Производим калибровку второй раз на случай, если была зажата противоположенный концевик! //
-            object_array_users[0].send_message_second_chat("Верхнее положение заслонки с улицы откалибровано.");
+            object_array_users[USERS::ME].send_message_second_chat("Верхнее положение заслонки с улицы откалибровано.");
           }
 
           if (_calibrate_ERROR == false)
           {
             _calibrate_ERROR = object_HOME_motor_plus_knobs.go_to_HIGH_limit();    // Производим калибровку второй раз на случай, если была зажата противоположенный концевик! //
-            object_array_users[0].send_message_second_chat("Верхнее положение заслонки от батареи откалибровано.");
+            object_array_users[USERS::ME].send_message_second_chat("Верхнее положение заслонки от батареи откалибровано.");
           }
           
 
@@ -478,11 +478,11 @@
             street_LOWEST_position_cur = object_STREET_motor_plus_knobs.get_LOWEST_position();
 
             int cal_dif1 = street_LOWEST_position_const - street_LOWEST_position_cur;
-            object_array_users[0].send_message_second_chat("Нижнее положожение заслонки с улицы откалибровано. Результат: " + String(street_LOWEST_position_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif1));
+            object_array_users[USERS::ME].send_message_second_chat("Нижнее положожение заслонки с улицы откалибровано. Результат: " + String(street_LOWEST_position_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif1));
 
             _calibrate_ERROR = object_STREET_motor_plus_knobs.go_to_HIGH_limit();          // открываем заслонку обратно //
 
-            object_array_users[0].send_message_second_chat("Положение заслонки с улицы возвращено в открытое положение. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
+            object_array_users[USERS::ME].send_message_second_chat("Положение заслонки с улицы возвращено в открытое положение. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
           }
 
           if (_calibrate_ERROR == false)                                              // калибровка нижнего положения HOME //
@@ -494,7 +494,7 @@
             _steps_GLOBAL = home_LOWEST_position_cur;
 
             int cal_dif2 = home_LOWEST_position_const - home_LOWEST_position_cur;
-            object_array_users[0].send_message_second_chat("Нижнее положожение заслонки от батареи откалибровано. Результат: " + String(home_LOWEST_position_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif2));
+            object_array_users[USERS::ME].send_message_second_chat("Нижнее положожение заслонки от батареи откалибровано. Результат: " + String(home_LOWEST_position_cur) + "\n\nОтклонение от константного значения: " + String(cal_dif2));
           }
         }
 
@@ -516,7 +516,7 @@
             
             doXsteps_func(buf_steps_amount, false);
             motor_calibration::state = motor_calibration::idle;
-            object_array_users[0].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
+            object_array_users[USERS::ME].send_message_second_chat("Положение заслонок возвращено в положение до калибровки. Текущее положение _steps_GLOBAL: " + String(_steps_GLOBAL));
           }
 
           if (_calibrate_ERROR == true)                                          // если есть ошибки - отправляем уведомление о невозможности калибровки //
@@ -531,7 +531,7 @@
           if(_doXsteps_counter != 0)                                             // если заслонки двигались хоть раз за пол дня - делаем калибровку //
           {
             motor_calibration::state = motor_calibration::quick;
-            object_array_users[0].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 15:00 до 15:30).");
+            object_array_users[USERS::ME].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 15:00 до 15:30).");
           }
 
           _daily_calibrate_flag = false;
@@ -548,7 +548,7 @@
         if (_step_counter_Flag == 1 && object_TimeDate.get_TimeB() > 234500)     // отправка отчета по количеству пройденых шагов за день //
         {
           _step_counter_Flag = 0;
-          object_array_users[0].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки и ручного управления): " + String(_doXsteps_counter));
+          object_array_users[USERS::ME].send_message_second_chat("Шагов сделано за сегодня (без учета калибровки и ручного управления): " + String(_doXsteps_counter));
           _doXsteps_counter = 0;
         }
 
@@ -775,7 +775,7 @@
 
       void recalibration()
       {
-        object_array_users[0].send_message("Начинаю процесс принудительной рекалибровки. Это займет 5 минут.");
+        object_array_users[USERS::ME].send_message("Начинаю процесс принудительной рекалибровки. Это займет 5 минут.");
 
         _stop_periodioc_mesuarement();
         _set_altitude();
@@ -878,7 +878,7 @@
         }
         else
         {
-          object_array_users[0].send_message("ОСТАНОВИЛ периодическое измерение в датчике СО2.");
+          object_array_users[USERS::ME].send_message("ОСТАНОВИЛ периодическое измерение в датчике СО2.");
         }
       }
 
@@ -893,7 +893,7 @@
         }
         else
         {
-          object_array_users[0].send_message("Выставил ALTITUDE (высоту над уровнем моря): " + String(_altitude) + "метров.");
+          object_array_users[USERS::ME].send_message("Выставил ALTITUDE (высоту над уровнем моря): " + String(_altitude) + "метров.");
         } 
       }
 
@@ -908,7 +908,7 @@
         }
         else
         {
-          object_array_users[0].send_message("ЗАПУСТИЛ периодическое измерение в датчике СО2.");
+          object_array_users[USERS::ME].send_message("ЗАПУСТИЛ периодическое измерение в датчике СО2.");
         }      
       }
 
@@ -932,7 +932,7 @@
         else
         {
           uint16_t Correction_in_ppm = frcCorrection - 0x8000;                 // 0x8000 = 32768 //
-          object_array_users[0].send_message("Рекалибровка прошла успешно. \n\nРезультаты:\n Текущее значение СО2: " + String(targetCo2Concentration) + "ppm.\n Коррекция: " + String(Correction_in_ppm) + "ppm." + "\n\n frcCorrection: " + String(frcCorrection));
+          object_array_users[USERS::ME].send_message("Рекалибровка прошла успешно. \n\nРезультаты:\n Текущее значение СО2: " + String(targetCo2Concentration) + "ppm.\n Коррекция: " + String(Correction_in_ppm) + "ppm." + "\n\n frcCorrection: " + String(frcCorrection));
         }
       }
 
@@ -948,7 +948,7 @@
         }
         else
         {
-          object_array_users[0].send_message("Сброс на заводские настройки прошёл успешно.");
+          object_array_users[USERS::ME].send_message("Сброс на заводские настройки прошёл успешно.");
         }
       }
   };
@@ -1420,9 +1420,9 @@
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
         {
-          object_array_users[1].set_id(text);
+          object_array_users[USERS::GUEST].set_id(text);
           object_array_users[users_array_index].send_message("Теперь я буду отвечать на входящие запросы с ID: " + text);
-          object_array_users[1].send_message("Я проснулся.");
+          object_array_users[USERS::GUEST].send_message("Я проснулся.");
         }
         break;
       }
