@@ -128,7 +128,7 @@
 
       void f_calcilate_low()
       {
-        if(_calculate_avg_flag == true)
+        if(_calculate_low_flag == true)
         {
           if(_low > millis() - _last_timestamp)
           {

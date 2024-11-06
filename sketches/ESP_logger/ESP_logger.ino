@@ -79,7 +79,11 @@ String SYNCdata;                                 // стринг для полу
       DOWN_PART_0,
       DOWN_PART_1,
       DOWN_PART_2,
-      CLOCK,
+      CLOCK_MASTER,
+      CLOCK_UP_PART_1,
+      CLOCK_UP_PART_2,
+      CLOCK_DOWN_PART_1,
+      CLOCK_DOWN_PART_2,
       ERROR_PART_0,
       ERROR_PART_1,
       ERROR_PART_2,
@@ -130,7 +134,7 @@ String SYNCdata;                                 // стринг для полу
 
     else
     {
-      Animation::state = Animation::CLOCK;
+      Animation::state = Animation::CLOCK_MASTER;
     }
   }
 
@@ -169,7 +173,7 @@ String SYNCdata;                                 // стринг для полу
 
     else
     {
-      Animation::state = Animation::CLOCK;
+      Animation::state = Animation::CLOCK_MASTER;
     }
   }
 
@@ -339,9 +343,33 @@ String SYNCdata;                                 // стринг для полу
         break;
       }
 
-      case Animation::CLOCK:
+      case Animation::CLOCK_MASTER:
       {
         clock_master();
+        break;
+      }
+
+      case Animation::CLOCK_UP_PART_1:
+      {
+        UP_clock_func_part_1();
+        break;
+      }
+
+      case Animation::CLOCK_UP_PART_2:
+      {
+        UP_clock_func_part_2();
+        break;
+      }
+
+      case Animation::CLOCK_DOWN_PART_1:
+      {
+        DOWN_clock_func_part_1();
+        break;
+      }
+
+      case Animation::CLOCK_DOWN_PART_2:
+      {
+        DOWN_clock_func_part_2();
         break;
       }
 
@@ -678,8 +706,6 @@ String SYNCdata;                                 // стринг для полу
 
   void clock_string_to_array_converter()           // конвертация показаний с датчиков в 13 цифр для индикации на табло //
   {
-    jesse_yield_func();
-
     byte dividerIndex = SYNCdata.indexOf(',');
     String buf_temp = SYNCdata.substring(0, dividerIndex);
     String buf1 = SYNCdata.substring(dividerIndex + 1);
@@ -690,8 +716,6 @@ String SYNCdata;                                 // стринг для полу
 
     byte dividerIndex3 = buf2.indexOf(',');
     String buf_co2 = buf2.substring(0, dividerIndex3);
-
-    jesse_yield_func();
 
     float buf1_temp = buf_temp.toFloat();
     buf1_temp = buf1_temp*10;
@@ -814,8 +838,6 @@ String SYNCdata;                                 // стринг для полу
 
   void clock_animation()                           // анимация часов  //
   {
-    jesse_yield_func();
-
     int hue_HSV_clock_day_random_buf = hue_HSV_clock_day_random;                          // буфер переменной для сравнения ниже //
 
     if (timer_min_hue_clock_target == 60)                         // если интервал 60 минут, то цвет меняется в 00 минут независимо от того, когда включили микроконтроллер //
@@ -836,39 +858,27 @@ String SYNCdata;                                 // стринг для полу
       }
     }
 
-    if (val_HSV_clock_cur <= val_HSV_clock_night)                               // если яркость меньше или равна ночному режиму, значит сейчас ночной режим. анимации отключена, управление по RGB. //
+    if (val_HSV_clock_cur <= val_HSV_clock_night)                              // если яркость меньше или равна ночному режиму, значит сейчас ночной режим. анимации отключена, управление по RGB. //
     {
       for(int i = 0; i < Clock_Leds_Amount; i++)
       {
         array_LED_clock [i] = CRGB((RGB_clock_night [0]*val_HSV_clock_cur*ClockArray_main [i]),(RGB_clock_night [1]*val_HSV_clock_cur*ClockArray_main [i]),(RGB_clock_night [2]*val_HSV_clock_cur*ClockArray_main [i]));
-
-        jesse_yield_func();
       }
-      FastLED.delay(50);
+
+      FastLED.delay(30);
+      Animation::state = Animation::NONE;
     }
 
-    else if (hue_HSV_clock_day_random != hue_HSV_clock_day_random_buf)                    // если яркость поменялась с начала функции - значит нужна анимация по HSV //
+    else if (hue_HSV_clock_day_random != hue_HSV_clock_day_random_buf)         // если цвет поменялся с начала функции - значит нужна анимация по HSV //
     {
-      if (object_TimeDate.get_MIN() % 2 > 0)                                        // анимация снизу вверх каждую нечетную минуту
+      if (object_TimeDate.get_MIN() % 2 > 0)                                   // анимация снизу вверх каждую нечетную минуту
       {
-        for(int i = 0; i < Clock_Leds_Amount; i++)
-        {
-          array_LED_clock [i] = CHSV(hue_HSV_clock_day_random, sat_HSV_clock_day, (val_HSV_clock_cur*ClockArray_main [i]));
-          FastLED.delay(20);
-
-          jesse_yield_func();
-        }
+        Animation::state = Animation::CLOCK_UP_PART_1;
       }
 
       else                                                        // анимация сверху вниз каждую четную минуту
       {
-        for(int i = Clock_Leds_Amount - 1; i >= 0; i--)
-        {
-          array_LED_clock [i] = CHSV(hue_HSV_clock_day_random, sat_HSV_clock_day, (val_HSV_clock_cur*ClockArray_main [i]));
-          FastLED.delay(20);
-
-          jesse_yield_func();
-        }
+        Animation::state = Animation::CLOCK_DOWN_PART_1;
       }
     }
 
@@ -877,19 +887,56 @@ String SYNCdata;                                 // стринг для полу
       for(int i = 0; i < Clock_Leds_Amount; i++)
       {
         array_LED_clock [i] = CHSV(hue_HSV_clock_day_random, sat_HSV_clock_day, (val_HSV_clock_cur*ClockArray_main [i]));
-
-        jesse_yield_func();
       }
+      FastLED.delay(30);
+      Animation::state = Animation::NONE;
+    }
+  }
+
+  void UP_clock_func_part_1()
+  {
+    Animation::counter = 0;
+    Animation::state = Animation::CLOCK_UP_PART_2;
+  }
+
+  void UP_clock_func_part_2()
+  {
+    if(Animation::counter < Clock_Leds_Amount)
+    {
+      array_LED_clock [Animation::counter] = CHSV(hue_HSV_clock_day_random, sat_HSV_clock_day, (val_HSV_clock_cur*ClockArray_main [Animation::counter]));
       FastLED.delay(20);
+      Animation::counter++;
     }
 
-    Animation::state = Animation::NONE;
+    else
+    {
+      Animation::state = Animation::NONE;
+    }
+  }
+
+  void DOWN_clock_func_part_1()
+  {
+    Animation::counter = Clock_Leds_Amount - 1;
+    Animation::state = Animation::CLOCK_DOWN_PART_2;
+  }
+
+  void DOWN_clock_func_part_2()
+  {
+    if(Animation::counter >= 0)
+    {
+      array_LED_clock [Animation::counter] = CHSV(hue_HSV_clock_day_random, sat_HSV_clock_day, (val_HSV_clock_cur*ClockArray_main [Animation::counter]));
+      FastLED.delay(20);
+      Animation::counter--;
+    }
+
+    else
+    {
+      Animation::state = Animation::NONE;
+    }
   }
 
   String clock_indication()                        // отображение текущего состояния отображения данных на табло в текстовом виде //
   {
-    jesse_yield_func();
-
     String buf_time_message;
     String buf_co2_message;
     String buf_temp_message;
@@ -904,8 +951,6 @@ String SYNCdata;                                 // стринг для полу
       buf_time_message = "\n  Время - отключено ( /11101 ).";
     }
 
-    jesse_yield_func();
-
     if (clock_night_indication_co2 == true)
     {
       buf_co2_message = "\n  СО2 - включено ( /11102 ).";    
@@ -915,8 +960,6 @@ String SYNCdata;                                 // стринг для полу
       buf_co2_message = "\n  СО2 - отключено ( /11102 ).";
     }
 
-    jesse_yield_func();
-
     if (clock_night_indication_temperature == true)
     {
       buf_temp_message = "\n  Температура - включена ( /11103 ).";     
@@ -925,8 +968,6 @@ String SYNCdata;                                 // стринг для полу
     {
       buf_temp_message = "\n  Температура - отключена ( /11103 ).";
     }
-
-    jesse_yield_func();
 
     if (clock_night_indication_humidity == true)
     {
