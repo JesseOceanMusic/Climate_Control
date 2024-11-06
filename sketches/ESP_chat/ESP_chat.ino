@@ -7,7 +7,7 @@
 //#define FB_USE_LOG Serial
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_008\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_009\Common_CODE.cpp"
 
 /// ↓↓↓ Синхронизация ошибок
 
@@ -171,7 +171,7 @@
   const int street_LOWEST_position_const = -2912;                                     // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
   const int home_LOWEST_position_const   =  3188;                                     // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
-  const int street_low_space = 100;                                                   // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+  const int street_low_space = 220;                                                   // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
   int street_LOWEST_position_cur = street_LOWEST_position_const + street_low_space;   // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
   int home_LOWEST_position_cur = home_LOWEST_position_const;                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
 
@@ -1707,12 +1707,9 @@
         break;
       }
 
-      case 666:                                  // debug enable/disable //
+      case 666:                                                       // запрос debug отчёта //
       {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          obj_debug_jesse.my_switch();
-        }
+        send_debug_repor_by_command();
         break;
       }
     }
@@ -1810,7 +1807,7 @@
 
   void loop()                                      // основной луп //
   {
-    unsigned long local_timestamp_ms = millis();                                 // для подсчета времени лупа //
+    obj_stopwatch_ms_loop.start();                                                    // для подсчета времени лупа //
 
     object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
@@ -1840,5 +1837,5 @@
       flag_every_minute_timer = false;
     }
 
-    obj_debug_jesse.loop_length_ms = millis() - local_timestamp_ms;
+    obj_stopwatch_ms_loop.stop();
   }

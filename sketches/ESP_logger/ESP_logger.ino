@@ -6,7 +6,7 @@
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 //#define FB_USE_LOG Serial
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_008\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_009\Common_CODE.cpp"
 
 /// ↓↓↓ SD карта
 
@@ -14,7 +14,6 @@
   #include <SD.h>                                  // ↑↑↑ //  
 
   String SYNCdata;                                 // стринг для полученных данных из Serial Port //
-  bool flag_every_day_timer = false;               // флаг для отправки лога раз в сутки //
 
   void LOG_write_sync_data()                       // запись лога //
   {
@@ -41,7 +40,8 @@
 
   void LOG_send_by_timer()                        // отправка лога в 23:45 //
   {
-    if (flag_every_day_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
+    static bool flag_every_day_log_timer;                                                   // флаг для отправки лога раз в сутки //
+    if (flag_every_day_log_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки лога в 23:45 //
     {
       if (!SD.begin(4))
       {
@@ -69,13 +69,13 @@
       {
         send_alert("ERROR: Create or open .txt FAILED");
       }
-      flag_every_day_timer = true;
+      flag_every_day_log_timer = true;
     }
 
 
-    if (flag_every_day_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы лог отправился на следующий день // 
+    if (flag_every_day_log_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы лог отправился на следующий день // 
     {    
-      flag_every_day_timer = false;
+      flag_every_day_log_timer = false;
     }
   }
 
@@ -1389,12 +1389,9 @@
         break;
       }
 
-      case 666:                                                       // debug enable/disable //
+      case 666:                                                       // запрос debug отчёта //
       {
-        if (object_array_users[users_array_index].get_admin_flag() == true)
-        {
-          obj_debug_jesse.my_switch();
-        }
+        send_debug_repor_by_command();
         break;
       }
     }
@@ -1482,9 +1479,9 @@
     //send_alert("Я проснулся.");
   }
 
-  void loop()                                      // основной луп //
+  void loop()                                                      // основной луп //
   {
-    unsigned long local_timestamp_ms = millis();                                 // для подсчета времени лупа //
+    obj_stopwatch_ms_loop.start();                                 // для подсчета времени лупа //
 
     object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
   
@@ -1521,7 +1518,7 @@
       flag_every_minute_timer = false;
     }
 
-    obj_debug_jesse.loop_length_ms = millis() - local_timestamp_ms;
+    obj_stopwatch_ms_loop.stop();
   }
 
 

@@ -1,3 +1,177 @@
+/// ↓↓↓ StopWatch
+
+  class cl_stopwatch_ms
+  {
+    public: 
+      cl_stopwatch_ms(String name, bool calculate_low, bool calculate_max, bool calculate_avg, bool count_above_limit, bool is_it_loop)
+      {
+        _name = name;
+        _calculate_low_flag = calculate_low;
+        _calculate_max_flag = calculate_max;
+        _calculate_avg_flag = calculate_avg;
+        _count_above_limit = count_above_limit;
+        _is_it_loop = is_it_loop;
+      }
+
+      void start()
+      {
+        _last_timestamp = millis();
+      }
+
+      void stop()
+      {
+        f_calcilate_low();
+        f_calculate_max();
+        f_calculate_avg();
+        f_check_high_limit();
+      }
+
+      unsigned int get_low()
+      {
+        return _low;
+      }
+
+      unsigned int get_max()
+      {
+        return _max;
+      }
+
+      float get_avg()
+      {
+        if(_iteretion_counter > 0)
+        {
+          if(_is_it_loop == true)
+          {
+            unsigned int elapsed_time_in_ms = millis() - _start_timestamp;
+            float avg = (float)elapsed_time_in_ms / (float)_iteretion_counter;
+            return avg;
+          }
+          else
+          {
+            float avg = (float)loop_length_sum_for_avg / (float)_iteretion_counter;
+            return avg;
+          }
+        }
+        return 0;
+      }
+
+      String get_string_info()
+      {
+        const unsigned long elapsed_time_ms  = millis() - _start_timestamp;
+        const unsigned int elapsed_time_sec  = elapsed_time_ms / 1000 % 60;
+        const unsigned int elapsed_time_min  = elapsed_time_ms / 1000 / 60 % 60;
+        const unsigned int elapsed_time_hour = elapsed_time_ms / 1000 / 60 / 60;
+        String buf_info  = String(_name) + " " + String(elapsed_time_hour) + ":" + String(elapsed_time_min) + ":" + String(elapsed_time_sec) + "\n";
+
+        if(_calculate_low_flag == true)
+        {
+          buf_info += "low: " + String(_low) + " ms.\n";
+        }
+
+        if(_calculate_avg_flag == true)
+        {
+          buf_info += "avg: " + String(get_avg()) + " ms.\n";
+        }
+        if(_count_above_limit == true)
+        {
+          buf_info += "\n";
+          for (int i = 0; i < _array_length; i++)
+          {
+            buf_info += "above" + String(_high_limit_array[i]) + ": ";
+            buf_info += String(_high_limit_counter_array[i]) + "\n";
+          }
+          buf_info += "\n";
+        }
+
+        if(_calculate_max_flag == true)
+        {
+          buf_info += "max: " + String(_max) + " ms.\n\n";
+        }
+
+        return buf_info;
+      }
+
+      void reset()
+      {
+        _low = 999999;
+        _max = 0;
+        _iteretion_counter = 0;
+
+        _start_timestamp = millis();
+      }
+
+    private:
+      String _name;
+      bool _is_it_loop;
+
+      unsigned long _start_timestamp;
+      unsigned long _last_timestamp;
+
+      bool _calculate_low_flag;
+      unsigned int _low = 999999;
+
+      bool _calculate_max_flag;
+      unsigned int _max = 0;
+
+      bool _calculate_avg_flag;
+      unsigned int _iteretion_counter = 0;
+      unsigned int loop_length_sum_for_avg;
+
+      bool _count_above_limit;
+      const byte _array_length = 11;
+      const unsigned int _high_limit_array [11] = {50, 100, 150, 200, 300, 400, 500, 700, 700, 1100, 1300, };
+      unsigned int _high_limit_counter_array [11];
+
+      void f_calcilate_low()
+      {
+        if(_calculate_avg_flag == true)
+        {
+          if(_low > millis() - _last_timestamp)
+          {
+            _low = millis() - _last_timestamp;
+          }
+        }
+      }
+
+      void f_calculate_max()
+      {
+        if(_calculate_max_flag == true)
+        {
+          if(_max < millis() - _last_timestamp)
+          {
+            _max = millis() - _last_timestamp;
+          }
+        }
+      }
+
+      void f_calculate_avg()
+      {
+        if(_calculate_avg_flag == true)
+        {
+          _iteretion_counter++;
+          if(_is_it_loop == false)
+          {
+            loop_length_sum_for_avg += (millis() - _last_timestamp);
+          }
+        }
+      }
+
+      void f_check_high_limit()
+      {
+        const unsigned int elapsed_time = millis() - _last_timestamp;
+        for (int i = 0; i < _array_length; i++)
+        {
+          if(elapsed_time > _high_limit_array[i])
+          {
+            _high_limit_counter_array[i]++;
+          }
+        }
+      }
+  };
+
+  cl_stopwatch_ms obj_stopwatch_ms_loop       ("LOOP",       false, true, true, true,  true);
+  cl_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",      false, true, false, true, false);
+
 /// ↓↓↓ Телеграм
 
   #include <FastBot2.h>
@@ -51,7 +225,8 @@
   bool shutdown_friends = false;
   const byte user_array_length = 7;
 
-  String buf_alert_message;
+  String global_buf_alert_msg;
+  String global_buf_debug_msg;
 
   const String memes_dir = "https://raw.githubusercontent.com/JesseOceanMusic/Climate_Control/refs/heads/main/memes/";
   const byte memes_amount = 9;
@@ -71,13 +246,14 @@
   class class_users
   {
     public:
-      class_users(byte users_array_index, String id, bool alert_flag, bool admin_flag, bool need_supervision, String name)
+      class_users(byte users_array_index, String id, bool alert_flag, bool admin_flag, bool need_supervision, bool debug_flag, String name)
       {
         _users_array_index = users_array_index;
         _id = id;
         _alert_flag = alert_flag;
         _admin_flag = admin_flag;
         _need_supervision = need_supervision;
+        _debug_flag = debug_flag;
         _name = name;
         _MessageState = 1;
       }
@@ -103,15 +279,23 @@
         }
       }
 
-      void send_alert_from_buf_alert_message()
+      void send_alert_from_global_string()
       {
         jesse_yield_func();
 
         if (_alert_flag == true)
         {
-          bot_main.sendMessage(fb::Message(buf_alert_message, _id));
+          bot_main.sendMessage(fb::Message(global_buf_alert_msg, _id));
         }
       }    
+
+      void send_debug_from_global_string()
+      {
+        jesse_yield_func();
+
+        bot_main.sendMessage(fb::Message(global_buf_debug_msg, _id));
+        global_buf_debug_msg = "";
+      }   
 
       void set_id(String id)
       {
@@ -174,20 +358,34 @@
       bool _alert_flag;                                      // true - отправляются уведомления алерты //
       bool _admin_flag;                                      // true - права администратора //
       bool _need_supervision;                                // true - при запросе сообщает мне. Нужно, чтобы понимать если кто-то обращается к боту вне групп и я не вижу сообщений //
+      bool _debug_flag;                                      // true - пользователь получает дебаг сообщения //
       String _name;                                          // Имя пользователя //
       unsigned int _MessageState;                            // стейт сообщений //
   };
 
   class_users object_array_users[user_array_length] =
   {
-    class_users(0, USER_ID0_me,            true,  true,  false, "Андрей"),                             // Мой айди //
-    class_users(1, USER_ID1_guest,         false, false, true,  "Гостевой чат"),                       // гостевой юзер //  
-    class_users(2, USER_ID2_debug,         false, false, false, "Debug"),                              // Группа для дебаг-сообщений //  
-    class_users(3, USER_ID3_Kate_group,    false, false, false, "Катя - группа"),                      // Катя - айди группы //
-    class_users(4, USER_ID4_Kate_personal, false, false, true,  "Катя - личная переписка"),            // Катя - личный айди //
-    class_users(5, USER_ID5_Sasha_group,   false, false, false, "Саша - группа"),                      // Саша - айди группы //
-    class_users(6, USER_ID6_Slava_Artem,   false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
+    class_users(0, USER_ID0_me,            true,  true,  false, false, "Андрей"),                             // Мой айди //
+    class_users(1, USER_ID1_guest,         false, false, true,  false, "Гостевой чат"),                       // гостевой юзер //  
+    class_users(2, USER_ID2_debug,         false, false, false, true,  "Debug"),                              // Группа для дебаг-сообщений //  
+    class_users(3, USER_ID3_Kate_group,    false, false, false, false, "Катя - группа"),                      // Катя - айди группы //
+    class_users(4, USER_ID4_Kate_personal, false, false, true,  false, "Катя - личная переписка"),            // Катя - личный айди //
+    class_users(5, USER_ID5_Sasha_group,   false, false, false, false, "Саша - группа"),                      // Саша - айди группы //
+    class_users(6, USER_ID6_Slava_Artem,   false, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
   };
+  namespace USERS
+  {
+    enum
+    {
+      ME                = 0,
+      GUEST             = 1,
+      DEBUG             = 2,
+      KATE_GROUP        = 3,
+      KATE_PERSONAL     = 4,
+      SASHA_GROUP       = 5,
+      SLAVA_ARTEM_GROUP = 6,
+    };
+  }
 
   void class_users::send_message(String input)
   {
@@ -225,17 +423,17 @@
 
   void send_alert(String input_message)            // функция для отправки уведомлений пользователям, которые на них подписаны //
   {
-    if(buf_alert_message.length() < 800)
+    if(global_buf_alert_msg.length() < 800)
     {
-      if(buf_alert_message.length() < 2)
+      if(global_buf_alert_msg.length() < 2)
       {
-        buf_alert_message = input_message;
+        global_buf_alert_msg = input_message;
       }
 
       else
       {
-        buf_alert_message += "\n\n";
-        buf_alert_message += input_message;
+        global_buf_alert_msg += "\n\n";
+        global_buf_alert_msg += input_message;
       }
     }
 
@@ -243,23 +441,31 @@
     {
       for(int i = 0; i < user_array_length; i++)
       {
-        object_array_users[i].send_alert("ERROR: Переполнен стринг buf_alert_message, отправка сообщения вне очереди:");
+        object_array_users[i].send_alert("ERROR: Переполнен стринг global_buf_alert_msg, отправка сообщения вне очереди:");
         delay(20);
-        object_array_users[i].send_alert_from_buf_alert_message();
+        object_array_users[i].send_alert_from_global_string();
       }
-      buf_alert_message = "";
+      global_buf_alert_msg = "";
     }
   }
 
-  void is_there_an_alert_to_send(bool can_i_send_message_flag)
+  void is_there_an_alert_or_debug_to_send(bool can_i_send_message_flag)
   {
-    if(can_i_send_message_flag == true && buf_alert_message.length() > 2)
+    if(can_i_send_message_flag == true)
     {
-      for(int i = 0; i < user_array_length; i++)
-      {  
-        object_array_users[i].send_alert_from_buf_alert_message();
+      if(global_buf_debug_msg.length() > 2)
+      {
+        object_array_users[USERS::DEBUG].send_debug_from_global_string();
       }
-      buf_alert_message = "";
+
+      else if(global_buf_alert_msg.length() > 2)
+      {
+        for(int i = 0; i < user_array_length; i++)
+        {
+          object_array_users[i].send_alert_from_global_string();
+        }
+        global_buf_alert_msg = "";
+      }
     }
   }
 
@@ -267,7 +473,7 @@
   {
     jesse_yield_func();
 
-    if(object_array_users[0].check_id(CHAT_IDcur, income_message) == true)        // вначале проверяем мой айди //
+    if(object_array_users[USERS::ME].check_id(CHAT_IDcur, income_message) == true)        // вначале проверяем мой айди //
     {
       return(true);
     }
@@ -360,7 +566,7 @@
     }
   }
 
-  #define bot_main_poll_period 27000
+  #define bot_main_poll_period 23000
                             // ↑↑   13/17/23/27/33/37 секунды, чтобы максимально редко было совпадение с моими циклами раз в 60 секунд //
                             // уведомления (send_alert) и дебаг-сообщения отправляются только между этими периодами, то есть раз в 13/17/23 секунды //
   #define bot_both_time_out 60000
@@ -399,117 +605,17 @@
       bot_second.updates.clearAll();
   }
 
-/// ↓↓↓ Debug 
-
-  ;
-
-  class class_debug_jesse
-  {
-    public:
-      unsigned long loop_length_ms;
-      unsigned long tick_max_length_ms;
-      unsigned long send_alert_max_length_ms;
-      unsigned int tick_above_900_counter;
-
-      class_debug_jesse()
-      {
-      }
-
-      void my_switch()                              // вкл/выкл дебага
-      {
-        _debug_enable_flag = !_debug_enable_flag;
-
-        String buf_msg  = "Отправка дебаг-сообщений ";
-               buf_msg += (_debug_enable_flag ? "включена." : "отключена.");
-                          // тернарный оператор
-                          // если _debug_enable_flag == true, то " включена"
-                          // если _debug_enable_flag == false, то " отключена"
-        object_array_users[0].send_message(buf_msg);
-      }
-
-      bool tick(bool can_i_send_message_flag)
-      {
-        if(_loop_max_length_ms < loop_length_ms)
-        {
-          _loop_max_length_ms = loop_length_ms;
-        }
-
-        if(esp_lowest_heap < ESP.getFreeHeap())
-        {
-          esp_lowest_heap = ESP.getFreeHeap();
-        }
-
-        _debug_loop_counter++;
-
-        if(_debug_enable_flag == true)
-        {   
-          unsigned long debug_elapsed_time_in_ms = millis() - _debug_time_start;
-
-          if (can_i_send_message_flag == true && _debug_loop_counter != 0 && debug_elapsed_time_in_ms > (debug_send_msg_period_ms))         // на всякий случай исключить деление на 0 // будет срабатывать каждые цикл с задержкой указанной в .setPollMode (раз в 20 секунд). или по таймеру debug_elapsed_time_in_ms //
-          {
-            unsigned int debug_elapsed_time_in_sec = debug_elapsed_time_in_ms / 1000;
-            float avg_loop_length = (float)debug_elapsed_time_in_ms / (float)_debug_loop_counter;
-            unsigned int loops_per_second = 0;
-            if(debug_elapsed_time_in_sec != 0)
-            {
-              loops_per_second = _debug_loop_counter / debug_elapsed_time_in_sec;
-            }
-            
-            String buf_message  = "Прошло времени: "              + String(debug_elapsed_time_in_sec) + " sec.\n"    +\
-                                  "Количество циклов: "           + String(_debug_loop_counter)        + "\n"        +\
-                                  "Циклов в секунду: "            + String(loops_per_second)          + "\n\n"       +\
-                                  "max loop length: "             + String(_loop_max_length_ms)        + " ms.\n"    +\
-                                  "avg loop length: "             + String(avg_loop_length)             + " ms.\n\n" +\
-                                  "max .tick length: "            + String(tick_max_length_ms)        + " ms.\n"     +\
-                                  "above_900 .tick: "             + String(tick_above_900_counter)    + " раз\n\n"   +\
-                                  "max send_alert length: "       + String(send_alert_max_length_ms)  + " ms.\n"     +\
-                                  "last debug_send_msg length: "  + String(_send_debug_msg_length_ms)  + " ms.\n\n"  +\
-                                  "lowest ESP.getFreeHeap(): "    + String(esp_lowest_heap)           + " байт.";
-
-            unsigned long local_timestamp_in_ms = millis();
-            object_array_users[2].send_message(buf_message);
-            _send_debug_msg_length_ms = millis() - local_timestamp_in_ms;
-
-            start_over();
-            return false;
-          }
-        }
-        return true;
-      }
-    private:
-      bool          _debug_enable_flag = false;
-      unsigned int  _debug_loop_counter;
-      unsigned int  _loop_max_length_ms;
-      unsigned int  _send_debug_msg_length_ms;
-      unsigned long _debug_time_start;
-      size_t esp_lowest_heap;
-
-      const unsigned int debug_send_msg_period_ms = 1000 * 60 * 10;
-
-      void start_over()
-      {
-        esp_lowest_heap = 0;
-        send_alert_max_length_ms = 0;
-        _loop_max_length_ms = 0;
-        _debug_time_start = millis();
-        tick_max_length_ms = 0;
-        tick_above_900_counter = 0;
-        _debug_loop_counter = 0;
-      }
-  };
-
-  class_debug_jesse obj_debug_jesse;  
+  void check_timer_for_sending_debug_report();  // прототип функции
 
   void bot_tick_and_call_debug()               // позволяет отправить сообщение без задержки в 1-2 секунды в режиме Long. Проблема есть только если сообщение отправляется вне обработчика входящий сообщений. // https://github.com/GyverLibs/FastBot2/blob/main/docs/3.start.md //
   {
-    unsigned long local_timestamp_ms = millis();
     jesse_yield_func();
 
-    static unsigned long millis_timer_for_tick;
+    static unsigned long timer_for_tick_ms;
     bool can_i_send_message_flag = false;
-    unsigned long local_timestamp_in_ms = millis();
 
-    if(millis() - millis_timer_for_tick > 5)
+    obj_stopwatch_ms_bot_tick.start();
+    if(millis() - timer_for_tick_ms > 5)
     {
       if(bot_main.tick() == true)
       {
@@ -518,30 +624,12 @@
           can_i_send_message_flag = true;
         }
       }
-      millis_timer_for_tick = millis();
+      timer_for_tick_ms = millis();
     }
+    obj_stopwatch_ms_bot_tick.stop();
 
-    if(millis() - local_timestamp_in_ms > obj_debug_jesse.tick_max_length_ms)
-    {
-      obj_debug_jesse.tick_max_length_ms = millis() - local_timestamp_in_ms;
-    }
-
-    if (millis() - local_timestamp_in_ms > 900)
-    {
-      obj_debug_jesse.tick_above_900_counter++;
-    }
-
-    if(obj_debug_jesse.tick(can_i_send_message_flag) == false)
-    {
-      can_i_send_message_flag = false;
-    }
-
-    local_timestamp_in_ms = millis();
-    is_there_an_alert_to_send(can_i_send_message_flag);
-    if(millis() - local_timestamp_in_ms > obj_debug_jesse.send_alert_max_length_ms)
-    {
-      obj_debug_jesse.send_alert_max_length_ms = millis() - local_timestamp_in_ms;
-    }
+    check_timer_for_sending_debug_report();
+    is_there_an_alert_or_debug_to_send(can_i_send_message_flag);
   }
 
 /// ↓↓↓ Время
@@ -729,3 +817,31 @@
     send_alert(buf_message);
   }
 
+/// ↓↓↓ Debug
+  void debug_report_constructor()
+  {
+    global_buf_debug_msg  = obj_stopwatch_ms_loop.get_string_info();
+    global_buf_debug_msg += obj_stopwatch_ms_bot_tick.get_string_info();
+    global_buf_debug_msg += "Free Heap: " + String(ESP.getFreeHeap());
+  }
+
+  void send_debug_repor_by_command()
+  {
+    debug_report_constructor();
+    object_array_users[users_array_index].send_debug_from_global_string();
+  }
+
+  void check_timer_for_sending_debug_report()
+  {
+    static bool flag_every_day_debug_timer;
+    if (flag_every_day_debug_timer == false && object_TimeDate.get_TimeB() > 234500)          // ТАЙМЕР отправки дебаг отчёта в 23:45 //
+    {
+      debug_report_constructor();
+      flag_every_day_debug_timer = true;
+    }
+
+    if (flag_every_day_debug_timer == true && object_TimeDate.get_TimeB() < 234400)           // Возвращает флаг обратно, чтобы дебаг отправился на следующий день // 
+    {    
+      flag_every_day_debug_timer = false;
+    }
+  }
