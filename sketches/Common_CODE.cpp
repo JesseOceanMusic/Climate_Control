@@ -122,9 +122,9 @@
       unsigned int _loop_length_sum_for_avg;
 
       bool _count_above_limit;
-      const byte _high_limit_array_length = 11;
-      const unsigned int _high_limit_array [11] = {50, 100, 150, 200, 300, 400, 500, 700, 700, 1100, 1300, };
-      unsigned int _high_limit_counter_array [11];
+      const byte _high_limit_array_length = 13;
+      const unsigned int _high_limit_array [13] = {50, 100, 150, 300, 500, 1000, 1500, 2000, 3000, 5000, 10000, 15000, 20000, };
+      unsigned int _high_limit_counter_array [13];
 
       void f_calcilate_low()
       {
@@ -175,6 +175,10 @@
 
   cl_stopwatch_ms obj_stopwatch_ms_loop       ("LOOP",       false, true, true, true,  true);
   cl_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",       false, true, false, true, false);
+
+  #ifdef THIS_IS_LOGGER_CODE
+    cl_stopwatch_ms obj_stopwatch_ms_send_log ("SEND LOG",   false, true, false, true, false);
+  #endif
 
 /// ↓↓↓ Телеграм
 
@@ -808,11 +812,54 @@
   }
 
 /// ↓↓↓ Debug
+
+  unsigned int heap_val_after_30_min = 0;
+  unsigned int heap_val_after_60_min = 0;
+  unsigned int heap_val_after_6_hours = 0;
+  unsigned int heap_val_after_12_hours = 0;
+  unsigned int heap_val_after_1_day = 0;
+  unsigned int heap_val_after_2_days = 0;
+  unsigned int heap_val_after_3_days = 0;
+  unsigned int heap_val_after_4_days = 0;  
+  unsigned int heap_val_lowest = 999999;
+
+  void heap_control()
+  {
+    if(1000*60*31 > millis() > 1000*60*30)
+    {
+      heap_val_after_30_min = ESP.getFreeHeap();
+    }
+
+    if(1000*60*61 > millis() > 1000*60*60)
+    {
+      heap_val_after_30_min = ESP.getFreeHeap();
+    }
+
+    if(heap_val_lowest > ESP.getFreeHeap())
+    {
+      heap_val_lowest = ESP.getFreeHeap();
+    }
+  }
+
   void debug_report_constructor()
   {
     global_buf_debug_msg  = obj_stopwatch_ms_loop.get_string_info();
     global_buf_debug_msg += obj_stopwatch_ms_bot_tick.get_string_info();
-    global_buf_debug_msg += "Free Heap: " + String(ESP.getFreeHeap());
+    #ifdef THIS_IS_LOGGER_CODE
+      global_buf_debug_msg += obj_stopwatch_ms_send_log.get_string_info();
+    #endif
+
+    global_buf_debug_msg += "FREE HEAP:\n";
+    global_buf_debug_msg += "after30min:"   + String(heap_val_after_30_min)   + "bytes.\n";
+    global_buf_debug_msg += "after60min:"   + String(heap_val_after_60_min)   + "bytes.\n";
+    global_buf_debug_msg += "after6hours:"  + String(heap_val_after_6_hours)  + "bytes.\n";
+    global_buf_debug_msg += "after12hours:" + String(heap_val_after_12_hours) + "bytes.\n";
+    global_buf_debug_msg += "after1day:"    + String(heap_val_after_1_day)    + "bytes.\n";
+    global_buf_debug_msg += "after2days:"   + String(heap_val_after_2_days)   + "bytes.\n";
+    global_buf_debug_msg += "after3days:"   + String(heap_val_after_3_days)   + "bytes.\n";
+    global_buf_debug_msg += "after4days:"   + String(heap_val_after_4_days)   + "bytes.\n\n";
+    global_buf_debug_msg += "lowest:"       + String(heap_val_lowest)         + "bytes.\n";
+    global_buf_debug_msg += "now: "         + String(ESP.getFreeHeap())       + "bytes.";
   }
 
   void send_debug_repor_by_command()

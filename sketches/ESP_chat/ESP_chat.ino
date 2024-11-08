@@ -7,7 +7,7 @@
 //#define FB_USE_LOG Serial
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_009\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_010\Common_CODE.cpp"
 
 /// ↓↓↓ Синхронизация ошибок
 
@@ -648,6 +648,24 @@
     }
   }
 
+/// ↓↓↓ Термостат
+
+  void thermostat()                                // термостат //
+  {
+    if(use_recuperator == false)
+    {
+      if (object_ds18b20_0.get_temp() < (TempMain - TempRange))        // Если рекуператор приток (in) меньше ...
+      {
+        object_motor_main.doXsteps_func((0 - Step_Per_loop), true);    // отрицательные значения открываем батарею, закрываем улицу //
+      }
+
+      else if (object_ds18b20_0.get_temp() > (TempMain + TempRange))   // Если рекуператор приток (in) больше ...
+      {             
+        object_motor_main.doXsteps_func(Step_Per_loop, true);          // положительные значения открываем улицу, закрываем батарею //
+      }
+    }
+  }
+
 /// ↓↓↓ Датчик температуры и влажности SHT41 + PWM/ШИМ увлажнителя
 
   #include "Adafruit_SHT4x.h"
@@ -656,8 +674,8 @@
 
   Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
-  float room_humidity_range  =  4.00;              // чувствительность +- включения выключения увлажнителя //
-  float room_humidity_target = 40.00;              // желаемая влажность //
+  float room_humidity_range  =  3.00;              // чувствительность +- включения выключения увлажнителя //
+  float room_humidity_target = 50.00;              // желаемая влажность //
 
   const int humidity_month_start = 9;              // первый месяц работы увлажнителя 9 (сентябрь) //
   const int humidity_month_end   = 4;              // последний месяц работы увлажнителя 4 (апрель) //
@@ -748,6 +766,29 @@
   };
 
   SHT41 object_Temp_Humidity_sensor;               // создаем экземпляр класса SHT41 (объект) //
+
+/// ↓↓↓ Увлажнитель
+
+  void humidifier()                                // увлажнитель //
+  {
+    if (object_TimeDate.get_DateMONTH() >= humidity_month_start || object_TimeDate.get_DateMONTH() <= humidity_month_end)
+    {
+      if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
+      {
+        analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
+      }
+
+      else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
+      {
+        analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
+      }
+    }
+
+    else
+    {
+      analogWrite(pin_PWM_Humidifier, 0);                              // от 0 до 255 // при старте увлажнитель выключен //
+    }
+  }
 
 /// ↓↓↓ Датчик СО2 - SCD41
 
@@ -1246,47 +1287,6 @@
     return(Message);
   }
 
-/// ↓↓↓ Термостат
-
-  void thermostat()                                // термостат //
-  {
-    if(use_recuperator == false)
-    {
-      if (object_ds18b20_0.get_temp() < (TempMain - TempRange))        // Если рекуператор приток (in) меньше ...
-      {
-        object_motor_main.doXsteps_func((0 - Step_Per_loop), true);    // отрицательные значения открываем батарею, закрываем улицу //
-      }
-
-      else if (object_ds18b20_0.get_temp() > (TempMain + TempRange))   // Если рекуператор приток (in) больше ...
-      {             
-        object_motor_main.doXsteps_func(Step_Per_loop, true);          // положительные значения открываем улицу, закрываем батарею //
-      }
-    }
-  }
-
-/// ↓↓↓ Увлажнитель
-
-  void humidifier()                                // увлажнитель //
-  {
-    if (object_TimeDate.get_DateMONTH() >= humidity_month_start || object_TimeDate.get_DateMONTH() <= humidity_month_end)
-    {
-      if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
-      {
-        analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
-      }
-
-      else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
-      {
-        analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
-      }
-    }
-
-    else
-    {
-      analogWrite(pin_PWM_Humidifier, 0);                              // от 0 до 255 // при старте увлажнитель выключен //
-    }
-  }
-
 /// ↓↓↓ Телеграм
 
   void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
@@ -1391,7 +1391,7 @@
       case 113:                                  // Установка желаемой влажности //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        room_humidity_target = constrain(buf_text_float, 5, 65);
+        room_humidity_target = constrain(buf_text_float, 5, 70);
         float hum_buf_low = room_humidity_target - room_humidity_range;
         float hum_buf_high = room_humidity_target + room_humidity_range;
 
@@ -1405,7 +1405,7 @@
       case 114:                                  // Установка чувствительности увлажнителя //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        room_humidity_range = constrain(buf_text_float, 3, 20);
+        room_humidity_range = constrain(buf_text_float, 1, 20);
         float hum_buf_low = room_humidity_target - room_humidity_range;
         float hum_buf_high = room_humidity_target + room_humidity_range;
 
@@ -1573,7 +1573,7 @@
 
       case 113:                                  // Установка желаемой влажности //
       {
-        String buf =  "Отправьте сообщение для установки желаемой влажности(от 5 до 65).\n\nТекущее значение: "    + String(room_humidity_target) +\
+        String buf =  "Отправьте сообщение для установки желаемой влажности(от 5 до 70).\n\nТекущее значение: "    + String(room_humidity_target) +\
                       "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
                       "\nПоследний месяц работы: " + String(humidity_month_end);
         object_array_users[users_array_index].send_message(buf);
@@ -1583,7 +1583,7 @@
 
       case 114:                                  // Установка чувствительности увлажнителя //
       {
-        String buf =  "Отправьте сообщение для установки чувствительности увлажнителя (от 3 до 20).\n\nТекущее значение: " + String(room_humidity_range)  +\
+        String buf =  "Отправьте сообщение для установки чувствительности увлажнителя (от 1 до 20).\n\nТекущее значение: " + String(room_humidity_range)  +\
                       "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: "         + String(humidity_month_start) +\
                       "\nПоследний месяц работы: " + String(humidity_month_end);
         object_array_users[users_array_index].send_message(buf);
@@ -1808,6 +1808,8 @@
   void loop()                                      // основной луп //
   {
     obj_stopwatch_ms_loop.start();                                                    // для подсчета времени лупа //
+
+    heap_control();
 
     object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
