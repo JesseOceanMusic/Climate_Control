@@ -1056,6 +1056,7 @@ String SYNCdata;                                 // стринг для полу
       else
       {
         String buf_user_ID = object_array_users[users_array_index].get_id();
+        f.chatID = buf_user_ID;
         bot_main.sendMessage(fb::Message("Ожидайте...\nОтправляю файл: " + file_name, object_array_users[users_array_index].get_id()));
         delay(20);
         bot_main.sendFile(f, false);
