@@ -813,31 +813,99 @@
 
 /// ↓↓↓ Debug
 
-  unsigned int heap_val_after_30_min = 0;
-  unsigned int heap_val_after_60_min = 0;
-  unsigned int heap_val_after_6_hours = 0;
-  unsigned int heap_val_after_12_hours = 0;
-  unsigned int heap_val_after_1_day = 0;
-  unsigned int heap_val_after_2_days = 0;
-  unsigned int heap_val_after_3_days = 0;
-  unsigned int heap_val_after_4_days = 0;  
-  unsigned int heap_val_lowest = 999999;
+  namespace free_heap
+  {
+    enum
+    {
+      AFTER_30_MIN,
+      AFTER_60_MIN,
+      AFTER_6_HOURS,
+      AFTER_12_HOURS,
+      AFTER_24_HOURS,
+      AFTER_2_DAYS,
+      AFTER_3_DAYS,
+      AFTER_4_DAYS,
+      END,
+    }state = free_heap::AFTER_30_MIN;
+
+    unsigned int after_30_min = 0;
+    unsigned int after_60_min = 0;
+    unsigned int after_6_hours = 0;
+    unsigned int after_12_hours = 0;
+    unsigned int after_24_hours = 0;
+    unsigned int after_2_days = 0;
+    unsigned int after_3_days = 0;
+    unsigned int after_4_days = 0;  
+    unsigned int lowest = 999999;
+  }
 
   void heap_control()
   {
-    if(1000*60*31 > millis() > 1000*60*30)
+    if(free_heap::lowest > ESP.getFreeHeap())
     {
-      heap_val_after_30_min = ESP.getFreeHeap();
+      free_heap::lowest = ESP.getFreeHeap();
     }
 
-    if(1000*60*61 > millis() > 1000*60*60)
+    switch(free_heap::state)
     {
-      heap_val_after_30_min = ESP.getFreeHeap();
-    }
-
-    if(heap_val_lowest > ESP.getFreeHeap())
-    {
-      heap_val_lowest = ESP.getFreeHeap();
+      case free_heap::AFTER_30_MIN:
+        if(millis() > 1000 * 60 * 30)
+        {
+          free_heap::after_30_min = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_60_MIN;
+          break;
+        }
+      case free_heap::AFTER_60_MIN:
+        if(millis() > 1000 * 60 * 60)
+        {
+          free_heap::after_60_min = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_6_HOURS;
+          break;
+        }
+      case free_heap::AFTER_6_HOURS:
+        if(millis() > 1000 * 60 * 60 * 6)
+        {
+          free_heap::after_6_hours = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_12_HOURS;
+          break;
+        }
+      case free_heap::AFTER_12_HOURS:
+        if(millis() > 1000 * 60 * 60 * 12)
+        {
+          free_heap::after_12_hours = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_24_HOURS;
+          break;
+        }
+      case free_heap::AFTER_24_HOURS:
+        if(millis() > 1000 * 60 * 60 * 24)
+        {
+          free_heap::after_24_hours = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_2_DAYS;
+          break;
+        }
+      case free_heap::AFTER_2_DAYS:
+        if(millis() > 1000 * 60 * 60 * 24 * 2)
+        {
+          free_heap::after_2_days = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_3_DAYS;
+          break;
+        }
+      case free_heap::AFTER_3_DAYS:
+        if(millis() > 1000 * 60 * 60 * 24 * 3)
+        {
+          free_heap::after_3_days = ESP.getFreeHeap();
+          free_heap::state = free_heap::AFTER_4_DAYS;
+          break;
+        }
+      case free_heap::AFTER_4_DAYS:
+        if(millis() > 1000 * 60 * 60 * 24 * 4)
+        {
+          free_heap::after_4_days = ESP.getFreeHeap();
+          free_heap::state = free_heap::END;
+          break;
+        }
+      case free_heap::END:
+          break;
     }
   }
 
@@ -850,16 +918,16 @@
     #endif
 
     global_buf_debug_msg += "FREE HEAP:\n";
-    global_buf_debug_msg += "after30min:"   + String(heap_val_after_30_min)   + "bytes.\n";
-    global_buf_debug_msg += "after60min:"   + String(heap_val_after_60_min)   + "bytes.\n";
-    global_buf_debug_msg += "after6hours:"  + String(heap_val_after_6_hours)  + "bytes.\n";
-    global_buf_debug_msg += "after12hours:" + String(heap_val_after_12_hours) + "bytes.\n";
-    global_buf_debug_msg += "after1day:"    + String(heap_val_after_1_day)    + "bytes.\n";
-    global_buf_debug_msg += "after2days:"   + String(heap_val_after_2_days)   + "bytes.\n";
-    global_buf_debug_msg += "after3days:"   + String(heap_val_after_3_days)   + "bytes.\n";
-    global_buf_debug_msg += "after4days:"   + String(heap_val_after_4_days)   + "bytes.\n\n";
-    global_buf_debug_msg += "lowest:"       + String(heap_val_lowest)         + "bytes.\n";
-    global_buf_debug_msg += "now: "         + String(ESP.getFreeHeap())       + "bytes.";
+    global_buf_debug_msg += "after30min:"   + String(free_heap::after_30_min)   + " bytes.\n";
+    global_buf_debug_msg += "after60min:"   + String(free_heap::after_60_min)   + " bytes.\n";
+    global_buf_debug_msg += "after6hours:"  + String(free_heap::after_6_hours)  + " bytes.\n";
+    global_buf_debug_msg += "after12hours:" + String(free_heap::after_12_hours) + " bytes.\n";
+    global_buf_debug_msg += "after1day:"    + String(free_heap::after_24_hours) + " bytes.\n";
+    global_buf_debug_msg += "after2days:"   + String(free_heap::after_2_days)   + " bytes.\n";
+    global_buf_debug_msg += "after3days:"   + String(free_heap::after_3_days)   + " bytes.\n";
+    global_buf_debug_msg += "after4days:"   + String(free_heap::after_4_days)   + " bytes.\n\n";
+    global_buf_debug_msg += "lowest:"       + String(free_heap::lowest)           + " bytes.\n";
+    global_buf_debug_msg += "now: "         + String(ESP.getFreeHeap())         + " bytes.";
   }
 
   void send_debug_repor_by_command()
