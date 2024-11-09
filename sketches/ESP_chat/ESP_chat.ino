@@ -171,7 +171,7 @@
   const int street_LOWEST_position_const = -2912;                                     // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
   const int home_LOWEST_position_const   =  3188;                                     // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
-  const int street_low_space = 220;                                                   // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+  const int street_low_space = 160;                                                   // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
   int street_LOWEST_position_cur = street_LOWEST_position_const + street_low_space;   // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
   int home_LOWEST_position_cur = home_LOWEST_position_const;                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
 

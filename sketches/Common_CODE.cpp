@@ -215,7 +215,7 @@
   bool message_intruder_flag = true;
   byte users_array_index;
   bool shutdown_friends = false;
-  const byte user_array_length = 7;
+  const byte user_array_length = 8;
 
   String global_buf_alert_msg;
   String global_buf_debug_msg;
@@ -238,14 +238,13 @@
   class class_users
   {
     public:
-      class_users(byte users_array_index, String id, bool alert_flag, bool admin_flag, bool need_supervision, bool debug_flag, String name)
+      class_users(byte users_array_index, String id, bool alert_flag, bool admin_flag, bool need_supervision, String name)
       {
         _users_array_index = users_array_index;
         _id = id;
         _alert_flag = alert_flag;
         _admin_flag = admin_flag;
         _need_supervision = need_supervision;
-        _debug_flag = debug_flag;
         _name = name;
         _MessageState = 1;
       }
@@ -350,7 +349,6 @@
       bool _alert_flag;                                      // true - отправляются уведомления алерты //
       bool _admin_flag;                                      // true - права администратора //
       bool _need_supervision;                                // true - при запросе сообщает мне. Нужно, чтобы понимать если кто-то обращается к боту вне групп и я не вижу сообщений //
-      bool _debug_flag;                                      // true - пользователь получает дебаг сообщения //
       String _name;                                          // Имя пользователя //
       unsigned int _MessageState;                            // стейт сообщений //
   };
@@ -366,18 +364,21 @@
       KATE_PERSONAL     = 4,
       SASHA_GROUP       = 5,
       SLAVA_ARTEM_GROUP = 6,
+      NOELE             = 7,
     };
   }
 
   class_users object_array_users[user_array_length] =
   {
-    class_users(USERS::ME,                USER_ID0_me,            true,  true,  false, false, "Андрей"),                             // Мой айди //
-    class_users(USERS::GUEST,             USER_ID1_guest,         false, false, true,  false, "Гостевой чат"),                       // гостевой юзер //  
-    class_users(USERS::DEBUG,             USER_ID2_debug,         false, false, false, true,  "Debug"),                              // Группа для дебаг-сообщений //  
-    class_users(USERS::KATE_GROUP,        USER_ID3_Kate_group,    false, false, false, false, "Катя - группа"),                      // Катя - айди группы //
-    class_users(USERS::KATE_PERSONAL,     USER_ID4_Kate_personal, false, false, true,  false, "Катя - личная переписка"),            // Катя - личный айди //
-    class_users(USERS::SASHA_GROUP,       USER_ID5_Sasha_group,   false, false, false, false, "Саша - группа"),                      // Саша - айди группы //
-    class_users(USERS::SLAVA_ARTEM_GROUP, USER_ID6_Slava_Artem,   false, false, false, false, "Слава и Артем - группа"),             // Слава и Артём - айди группы //
+    //         /users_array_index        /telegram ID              /alert /admin /supervision /name 
+    class_users(USERS::ME,                USER_ID0_me,              true,  true,  false,      "Андрей"),                   // Мой айди //
+    class_users(USERS::GUEST,             USER_ID1_guest,           false, false, true,       "Гостевой чат"),             // гостевой юзер //  
+    class_users(USERS::DEBUG,             USER_ID2_debug,           false, false, false,      "Debug"),                    // Группа для дебаг-сообщений //  
+    class_users(USERS::KATE_GROUP,        USER_ID3_Kate_group,      false, true,  false,      "Катя - группа"),            // Катя - айди группы //
+    class_users(USERS::KATE_PERSONAL,     USER_ID4_Kate_personal,   false, true,  true,       "Катя - личная переписка"),  // Катя - личный айди //
+    class_users(USERS::SASHA_GROUP,       USER_ID5_Sasha_group,     false, false, false,      "Саша - группа"),            // Саша - айди группы //
+    class_users(USERS::SLAVA_ARTEM_GROUP, USER_ID6_Slava_Artem,     false, false, false,      "Слава и Артем - группа"),   // Слава и Артём - айди группы //
+    class_users(USERS::NOELE,             USER_ID7_Noele,           false, false, false,      "Ноэль - группа"),           // Ноэль - айди группы //
   };
 
 
