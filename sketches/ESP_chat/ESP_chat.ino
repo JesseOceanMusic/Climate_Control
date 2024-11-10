@@ -625,8 +625,8 @@
         if(use_recuperator == false || send_message_anyway == true)
         {
         String recuperator_info_message  = "\n\n*В режиме Рекуператор стоит увеличивать количество приточного воздуха,";
-              recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.";
-              recuperator_info_message += " Скорость 2/1 (приток/вытяжка) для межсезонья самый оптимальный вариант.";
+              recuperator_info_message += " чтобы было положительное давление в квартире и пыль/запахи не затягивало из щелей в стенах.\n";
+              recuperator_info_message += " Скорость выставлять так, чтобы КПД рекуперации не вытяжку было на 10-20% больше, чем на приток.";
 
         use_recuperator = true;
         send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
