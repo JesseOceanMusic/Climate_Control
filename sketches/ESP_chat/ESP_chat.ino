@@ -7,7 +7,7 @@
 //#define FB_USE_LOG Serial
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_010\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_011\Common_CODE.cpp"
 
 /// ↓↓↓ Синхронизация ошибок
 
@@ -58,7 +58,7 @@
         jesse_yield_func();
 
         _temp = ds.getTempC(_array_address);
-        //  _second_temp_request();
+        _second_temp_request();                  // Очень редко (раз в несколько дней) какой-то датчик может дать неправильные показания. Возможно эта функция избавит от лишних уведомлений об "ошибках".
 
         _check_alerts();
         _check_errors();   
@@ -124,10 +124,12 @@
 
       void _second_temp_request()                  // если датчик не прислал показания пробуем запросить еще раз. При Ошибке выдаёт -127.00 //
       {
-        if(_temp < -120)                           
+        int local_counter = 0;
+        while(_temp < -120 && local_counter < 5)                           
         {
           delay(50);
           _temp = ds.getTempC(_array_address);
+          local_counter++;
         }
       }
   };
@@ -143,9 +145,10 @@
 
 /// ↓↓↓ Управление заслонками
 
-  float TempMain       = 23.20;                    // температура термостата //
-  float TempRange      =   0.2;                    // чувствительность термостата //
-  int Step_Per_loop    =    40;                    // количество шагов двигателя за цикл запуска термостата //
+  float temp_thermostat_target_for_air_dumpers = 23.40;    // температура термостата для режима заслонки //
+  float temp_thermostat_target_for_recuperator = 3;        // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
+  float temp_thermostat_range                  = 0.2;      // чувствительность термостата //
+  int Step_Per_loop                            = 40;       // количество шагов двигателя за цикл запуска термостата //
 
   bool use_recuperator;                            // флаг режима рекуператор/заслонки //
   #define recuperator_button A0                    // пин выключателя режима //
@@ -171,7 +174,7 @@
   const int street_LOWEST_position_const = -2912;                                     // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
   const int home_LOWEST_position_const   =  3188;                                     // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
-  const int street_low_space = 160;                                                   // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+  const int street_low_space = 80;                                                    // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
   int street_LOWEST_position_cur = street_LOWEST_position_const + street_low_space;   // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
   int home_LOWEST_position_cur = home_LOWEST_position_const;                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
 
@@ -637,29 +640,31 @@
     }
   }
 
-  void close_air_dumpers_fast()                    // Быстрое закрытие заслонок при изменение режима вентиляции на "рекуператор" //
-  {
-    if(use_recuperator == true)
-    {
-      if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_cur)
-      {
-        object_motor_main.doXsteps_func(Step_Per_loop, true);                  // положительные значения открываем улицу, закрываем батарею //          
-      }
-    }
-  }
-
 /// ↓↓↓ Термостат
 
   void thermostat()                                // термостат //
   {
-    if(use_recuperator == false)
+    if(use_recuperator == false)                 // режим заслонок //
     {
-      if (object_ds18b20_0.get_temp() < (TempMain - TempRange))        // Если рекуператор приток (in) меньше ...
+      if (object_ds18b20_0.get_temp() < (temp_thermostat_target_for_air_dumpers - temp_thermostat_range))        // Если рекуператор приток (in) меньше ...
       {
         object_motor_main.doXsteps_func((0 - Step_Per_loop), true);    // отрицательные значения открываем батарею, закрываем улицу //
       }
 
-      else if (object_ds18b20_0.get_temp() > (TempMain + TempRange))   // Если рекуператор приток (in) больше ...
+      else if (object_ds18b20_0.get_temp() > (temp_thermostat_target_for_air_dumpers + temp_thermostat_range))   // Если рекуператор приток (in) больше ...
+      {             
+        object_motor_main.doXsteps_func(Step_Per_loop, true);          // положительные значения открываем улицу, закрываем батарею //
+      }
+    }
+
+    else                                         // режим рекупетора //
+    {
+      if (object_ds18b20_0.get_temp() < (temp_thermostat_target_for_recuperator - temp_thermostat_range))        // Если рекуператор приток (in) меньше ...
+      {
+        object_motor_main.doXsteps_func((0 - Step_Per_loop), true);    // отрицательные значения открываем батарею, закрываем улицу //
+      }
+
+      else if (object_ds18b20_0.get_temp() > (temp_thermostat_target_for_recuperator + temp_thermostat_range))   // Если рекуператор приток (in) больше ...
       {             
         object_motor_main.doXsteps_func(Step_Per_loop, true);          // положительные значения открываем улицу, закрываем батарею //
       }
@@ -674,11 +679,12 @@
 
   Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
-  float room_humidity_range  =  3.00;              // чувствительность +- включения выключения увлажнителя //
+  float room_humidity_range  =  2.00;              // чувствительность +- включения выключения увлажнителя //
   float room_humidity_target = 50.00;              // желаемая влажность //
 
-  const int humidity_month_start = 9;              // первый месяц работы увлажнителя 9 (сентябрь) //
-  const int humidity_month_end   = 4;              // последний месяц работы увлажнителя 4 (апрель) //
+  float room_conditioner_temp_range  = 0.4;        // чувствительность +- включения выключения "охладителя" //
+  float room_conditioner_temp_target = 23.6;       // желаемая температура летом //
+  bool  room_conditioner_flag = true;
 
   class SHT41                                      // класс датчика SHT41 температуры и влажности //
   {
@@ -767,11 +773,11 @@
 
   SHT41 object_Temp_Humidity_sensor;               // создаем экземпляр класса SHT41 (объект) //
 
-/// ↓↓↓ Увлажнитель
+/// ↓↓↓ Увлажнитель и "охладитель"
 
   void humidifier()                                // увлажнитель //
   {
-    if (object_TimeDate.get_DateMONTH() >= humidity_month_start || object_TimeDate.get_DateMONTH() <= humidity_month_end)
+    if(room_conditioner_flag == false)
     {
       if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
       {
@@ -786,7 +792,15 @@
 
     else
     {
-      analogWrite(pin_PWM_Humidifier, 0);                              // от 0 до 255 // при старте увлажнитель выключен //
+      if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range) || object_Temp_Humidity_sensor.get_temp() > (room_conditioner_temp_target + room_conditioner_temp_range))
+      {
+        analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
+      }
+
+      else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range) && object_Temp_Humidity_sensor.get_temp() < (room_conditioner_temp_target - room_conditioner_temp_range))
+      {
+        analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
+      }      
     }
   }
 
@@ -1289,7 +1303,7 @@
 
 /// ↓↓↓ Телеграм
 
-  void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
+  void Message_command_get_data(String text)     // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
   {
     jesse_yield_func();
 
@@ -1320,20 +1334,31 @@
         break;
       }
 
-      case 104:                                  // установка температуры термостата //
+      case 104:                                  // установка температуры термостата для режима заслонок //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        TempMain = constrain(buf_text_float, -55, 55);
-        object_array_users[users_array_index].send_message("Термостат установлен на температуру: " + String(TempMain) + "°C");
+        temp_thermostat_target_for_air_dumpers = constrain(buf_text_float, 5, 30);
+        object_array_users[users_array_index].send_message("Термостат для режима заслоноки установлен на температуру: " + String(temp_thermostat_target_for_air_dumpers) + "°C");
         break;      
       }
 
       case 105:                                  // установка чувствительности термостата //
       {
         float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        TempRange = constrain(buf_text_float, 0.2, 6);
-        object_array_users[users_array_index].send_message("Термостат включится/выключится при отклонение +- " + String(TempRange) + "°C");
+        temp_thermostat_range = constrain(buf_text_float, 0.2, 6);
+        object_array_users[users_array_index].send_message("Термостат включится/выключится при отклонение +- " + String(temp_thermostat_range) + "°C");
         break;   
+      }
+
+      case 306:                                  // установка температуры термостата для режима рекуператор //
+      {
+        if (object_array_users[users_array_index].get_admin_flag() == true)
+        {  
+          float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+          temp_thermostat_target_for_recuperator = constrain(buf_text_float, -8, 8);
+          object_array_users[users_array_index].send_message("Термостат для режима рекуператор установлен на температуру: " + String(temp_thermostat_target_for_recuperator) + "°C");
+        }     
+        break;
       }
 
       case 108:                                  // установка шага заслонок //
@@ -1416,6 +1441,22 @@
         break;  
       }
 
+      case 116:                                   // установка температуры охладителя //
+      {
+        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        room_conditioner_temp_target = constrain(buf_text_float, 22, 30);
+        object_array_users[users_array_index].send_message("Охладитель установлен на температуру: " + String(room_conditioner_temp_target) + "°C");
+        break; 
+      }
+
+      case 117:                                   // установка чувствительности охладителя //
+      {
+        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
+        room_conditioner_temp_target = constrain(buf_text_float, 0.2, 6);
+        object_array_users[users_array_index].send_message("Охладитель включится/выключится при отклонение +- " + String(room_conditioner_temp_target) + "°C");
+        break;   
+      }
+
       case 390:                                  // выбор гостевого чата вручную //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
@@ -1430,7 +1471,7 @@
     object_array_users[users_array_index].set_message_state(1);
   }
 
-  void Message_command_send_data(int text_int)      // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
+  void Message_command_send_data(int text_int)   // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
   {
     jesse_yield_func();
 
@@ -1488,10 +1529,10 @@
         break;            
       }
 
-      case 104:                                  // установка температуры термостата //
+      case 104:                                  // установка температуры термостата для режима заслонок //
       {
-        String buf =  "Отправьте сообщение для установки температуры термостата в °C (от -55 до 55):\n\nТекущее значение: " + String(TempMain) +\
-                      "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in).\n\n**Термостат не будет работать пока разница температур на улице и дома не достигнет 8 градусов (Пока этого не произойдет - процент водуха с улицы и от батареи будет равен нулю).";
+        String buf =  "Отправьте сообщение для установки температуры термостата для режима заслонки в °C (от 5 до 30):\n\nТекущее значение: " + String(temp_thermostat_target_for_air_dumpers) +\
+                      "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in).";
         object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(104);
         break;
@@ -1499,10 +1540,19 @@
 
       case 105:                                  // установка чувствительности термостата //
       {
-        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности термостата в °C (от 0.2 до 6):\n\nТекущее значение: " + String(TempRange));
+        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности термостата в °C (от 0.2 до 6):\n\nТекущее значение: " + String(temp_thermostat_range));
         object_array_users[users_array_index].set_message_state(105);
         break;
       }
+
+      case 306:                                  // установка температуры термостата для режима рекуператор //
+      {
+        String buf =  "Отправьте сообщение для установки температуры термостата для режима рекуператор в °C (от -8 до 8):\n\nТекущее значение: " + String(temp_thermostat_target_for_recuperator) +\
+                      "\n\n*Термостат управляет температурой по датчику Рекуператор Приток(in). \n\nЭта настройка нужна для предотвращения обмерзания рекуператора зимой.";
+        object_array_users[users_array_index].send_message(buf);
+        object_array_users[users_array_index].set_message_state(306);
+        break;
+      }      
 
       case 108:                                  // установка шага заслонок //
       {
@@ -1573,9 +1623,7 @@
 
       case 113:                                  // Установка желаемой влажности //
       {
-        String buf =  "Отправьте сообщение для установки желаемой влажности(от 5 до 70).\n\nТекущее значение: "    + String(room_humidity_target) +\
-                      "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: " + String(humidity_month_start) +\
-                      "\nПоследний месяц работы: " + String(humidity_month_end);
+        String buf =  "Отправьте сообщение для установки желаемой влажности(от 5 до 70).\n\nТекущее значение: "    + String(room_humidity_target);
         object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(113);
         break;
@@ -1583,11 +1631,39 @@
 
       case 114:                                  // Установка чувствительности увлажнителя //
       {
-        String buf =  "Отправьте сообщение для установки чувствительности увлажнителя (от 1 до 20).\n\nТекущее значение: " + String(room_humidity_range)  +\
-                      "\n\n*Напоминаю, что увлажнитель не будет включатся в летние месяцы.\nПервый месяц работы: "         + String(humidity_month_start) +\
-                      "\nПоследний месяц работы: " + String(humidity_month_end);
+        String buf =  "Отправьте сообщение для установки чувствительности увлажнителя (от 1 до 20).\n\nТекущее значение: " + String(room_humidity_range);
         object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(114);
+        break;
+      }
+
+      case 115:                                   // вкл/откл охладителя //
+      {
+        room_conditioner_flag = !room_conditioner_flag;
+        if (room_conditioner_flag == true)
+        {
+          object_array_users[users_array_index].send_message("Охладитель включен.");
+        }
+        else
+        {
+          object_array_users[users_array_index].send_message("Охладитель отключен.");
+        }
+        break;
+      }
+
+      case 116:                                   // установка температуры охладителя //
+      {
+        String buf =  "Отправьте сообщение для установки температуры охладителя в °C (от 22 до 30):\n\nТекущее значение: " + String(room_conditioner_temp_target) +\
+                      "\n\n*Охладитель управляет увлажнителем. (во время испарения воды (адиабатическое охлаждение/увлажнение) происходит незначительное охлаждение, может помочь немного снизить температуру летом)";
+        object_array_users[users_array_index].send_message(buf);
+        object_array_users[users_array_index].set_message_state(116);
+        break;
+      }
+
+      case 117:                                   // установка чувствительности охладителя //
+      {
+        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности охладителя в °C (от 0.2 до 6):\n\nТекущее значение: " + String(room_conditioner_temp_range));
+        object_array_users[users_array_index].set_message_state(117);
         break;
       }
 
@@ -1814,8 +1890,6 @@
     object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
     recuperator_button_check(false);                                                  // проверяем положение выключателя //
-
-    close_air_dumpers_fast();                                                         // меняем быстро положение заслонок, если включили режим рекуперации //
 
     bot_tick_and_call_debug();                                                        // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
 
