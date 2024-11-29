@@ -145,8 +145,8 @@
 
 /// ↓↓↓ Управление заслонками
 
-  float temp_thermostat_target_for_air_dumpers = 22.4;     // температура термостата для режима заслонки //
-  float temp_thermostat_target_for_recuperator = 3;        // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
+  float temp_thermostat_target_for_air_dumpers = 23.0;     // температура термостата для режима заслонки //
+  float temp_thermostat_target_for_recuperator = 2.0;      // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
   float temp_thermostat_range                  = 0.15;     // чувствительность термостата //
   int Step_Per_loop                            = 10;       // количество шагов двигателя за цикл запуска термостата //
 
@@ -177,6 +177,17 @@
   const int street_low_space = 70;                                                    // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
   int street_LOWEST_position_cur = street_LOWEST_position_const + street_low_space;   // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
   int home_LOWEST_position_cur = home_LOWEST_position_const;                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
+
+
+  namespace air_dumpers_fast_change_position
+  {
+    enum
+    {
+      IDLE         = 0,
+      CLOSE_STREET = 1,
+      OPEN_STREET  = 2,
+    }state = air_dumpers_fast_change_position::IDLE;
+  }
 
   class class_motor
   {
@@ -619,7 +630,8 @@
                 recuperator_info_message_2 += " Скорость вытяжного вентилятор 0 или 1";
 
           use_recuperator = false;
-          send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);      
+          send_alert("Выбран режим вентиляции: Заслонки." + recuperator_info_message_2);
+          air_dumpers_fast_change_position::state = air_dumpers_fast_change_position::CLOSE_STREET;
         }
       }
 
@@ -633,10 +645,40 @@
 
         use_recuperator = true;
         send_alert("Выбран режим вентиляции: Рекуператор." + recuperator_info_message);
+        air_dumpers_fast_change_position::state = air_dumpers_fast_change_position::OPEN_STREET;
         }
       }
 
       millis_timer_button_check = millis();
+    }
+  }
+
+  void move_air_dumpers_fast()                    // Быстрое закрытие или открытие заслонок при изменение режима вентиляции //
+  {
+    if(air_dumpers_fast_change_position::state == air_dumpers_fast_change_position::OPEN_STREET)
+    {
+      if(object_motor_main.get_steps_GLOBAL() != home_LOWEST_position_cur)
+      {
+        object_motor_main.doXsteps_func(Step_Per_loop, true);                  // положительные значения открываем улицу, закрываем батарею //          
+      }
+
+      else
+      {
+        air_dumpers_fast_change_position::state = air_dumpers_fast_change_position::IDLE;
+      }
+    }
+    
+    if(air_dumpers_fast_change_position::state == air_dumpers_fast_change_position::CLOSE_STREET)
+    {
+      if(object_motor_main.get_steps_GLOBAL() != street_LOWEST_position_cur)
+      {
+        object_motor_main.doXsteps_func(0 - Step_Per_loop, true);                  // положительные значения открываем улицу, закрываем батарею //          
+      }
+
+      else
+      {
+        air_dumpers_fast_change_position::state = air_dumpers_fast_change_position::IDLE;
+      }      
     }
   }
 
@@ -649,10 +691,10 @@
   Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
   float room_humidity_range  =  2.00;              // чувствительность +- включения выключения увлажнителя //
-  float room_humidity_target = 50.00;              // желаемая влажность //
+  float room_humidity_target = 45.00;              // желаемая влажность //
 
-  float room_conditioner_temp_range  = 0.4;        // чувствительность +- включения выключения "охладителя" //
-  float room_conditioner_temp_target = 23.6;       // желаемая температура летом //
+  float room_conditioner_temp_range  = 0.3;        // чувствительность +- включения выключения "охладителя" //
+  float room_conditioner_temp_target = 23.7;       // желаемая температура летом //
   bool  room_conditioner_flag = true;
 
   class SHT41                                      // класс датчика SHT41 температуры и влажности //
@@ -1911,6 +1953,8 @@
     object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 
     recuperator_button_check(false);                                                  // проверяем положение выключателя //
+
+    move_air_dumpers_fast();                                                          // меняем быстро положение заслонок, если включили режим рекуперации //
 
     bot_tick_and_call_debug();                                                        // update telegram - получение сообщения из телеги и их обработка // внутри вызывается debug и .tick //
 
