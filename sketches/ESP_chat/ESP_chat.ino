@@ -36,8 +36,8 @@
     public:
       class_ds18b20(bool alert_flag, byte ar0, byte ar1, byte ar2, byte ar3, byte ar4, byte ar5, byte ar6, byte ar7, String name, float crit_temp_high_error)  // конструктор класса //
       {
-        _crit_temp_low_alert = 4.00;
-        _crit_temp_low_error = -45.00;
+        _crit_temp_low_alert = 1.0;
+        _crit_temp_low_error = -45.0;
         _crit_temp_high_error = crit_temp_high_error;
 
         _alert_flag = alert_flag;
@@ -124,12 +124,10 @@
 
       void _second_temp_request()                  // если датчик не прислал показания пробуем запросить еще раз. При Ошибке выдаёт -127.00 //
       {
-        int local_counter = 0;
-        while(_temp < -120 && local_counter < 5)                           
+        for(int i = 0; _temp < -120 && i < 10 ; i++)
         {
-          delay(50);
+          delay(100);
           _temp = ds.getTempC(_array_address);
-          local_counter++;
         }
       }
   };
@@ -146,7 +144,7 @@
 /// ↓↓↓ Управление заслонками
 
   float temp_thermostat_target_for_air_dumpers = 23.0;     // температура термостата для режима заслонки //
-  float temp_thermostat_target_for_recuperator = 2.0;      // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
+  float temp_thermostat_target_for_recuperator = 2.5;      // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
   float temp_thermostat_range                  = 0.15;     // чувствительность термостата //
   int Step_Per_loop                            = 10;       // количество шагов двигателя за цикл запуска термостата //
 
@@ -691,7 +689,7 @@
   Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
   float room_humidity_range  =  2.00;              // чувствительность +- включения выключения увлажнителя //
-  float room_humidity_target = 45.00;              // желаемая влажность //
+  float room_humidity_target = 40.00;              // желаемая влажность //
 
   float room_conditioner_temp_range  = 0.3;        // чувствительность +- включения выключения "охладителя" //
   float room_conditioner_temp_target = 23.7;       // желаемая температура летом //
