@@ -695,10 +695,10 @@
   float room_conditioner_temp_target = 23.7;       // желаемая температура летом //
   bool  room_conditioner_flag = true;
 
-  class SHT41                                      // класс датчика SHT41 температуры и влажности //
+  class class_SHT41                                // класс датчика SHT41 температуры и влажности //
   {
     public:
-      SHT41()                                      // конструктор класса //
+      class_SHT41()                                // конструктор класса //
       {
         _humidity_low_alert = 15;
         _humidity_high_alert = 80;
@@ -780,7 +780,7 @@
       }
   };
 
-  SHT41 object_Temp_Humidity_sensor;               // создаем экземпляр класса SHT41 (объект) //
+  class_SHT41 object_Temp_Humidity_sensor;         // создаем экземпляр класса SHT41 (объект) //
 
 /// ↓↓↓ Термостат
 
@@ -872,10 +872,10 @@
 
   SensirionI2CScd4x scd4x;
 
-  class SCD41                                      // класс датчика СО2 //
+  class class_SCD41                                      // класс датчика СО2 //
   {
     public:
-      SCD41()
+      class_SCD41()
       {
         _co2_high_alert = 1200;
         _altitude = 215;
@@ -1069,7 +1069,7 @@
       }
   };
 
-  SCD41 object_CO2_sensor;                         
+  class_SCD41 object_CO2_sensor;                         
 
 /// ↓↓↓ Обновление показаний датчиков
 

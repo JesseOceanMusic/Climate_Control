@@ -1,9 +1,9 @@
 /// ↓↓↓ StopWatch
 
-  class cl_stopwatch_ms
+  class class_stopwatch_ms
   {
     public: 
-      cl_stopwatch_ms(String name, bool calculate_low, bool calculate_max, bool calculate_avg, bool count_above_limit, bool is_it_loop)
+      class_stopwatch_ms(String name, bool calculate_low, bool calculate_max, bool calculate_avg, bool count_above_limit, bool is_it_loop)
       {
         _name = name;
         _calculate_low_flag = calculate_low;
@@ -173,11 +173,11 @@
       }
   };
 
-  cl_stopwatch_ms obj_stopwatch_ms_loop       ("LOOP",       false, true, true, true,  true);
-  cl_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",       false, true, false, true, false);
+  class_stopwatch_ms obj_stopwatch_ms_loop       ("LOOP",       false, true, true, true,  true);
+  class_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",       false, true, false, true, false);
 
   #ifdef THIS_IS_LOGGER_CODE
-    cl_stopwatch_ms obj_stopwatch_ms_send_log ("SEND LOG",   false, true, false, true, false);
+    class_stopwatch_ms obj_stopwatch_ms_send_log ("SEND LOG",   false, true, false, true, false);
   #endif
 
 /// ↓↓↓ Телеграм
