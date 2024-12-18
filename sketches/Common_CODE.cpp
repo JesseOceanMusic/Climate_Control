@@ -215,7 +215,7 @@
   bool message_intruder_flag = true;
   byte users_array_index;
   bool shutdown_friends = false;
-  const byte user_array_length = 8;
+  const byte user_array_length = 9;
 
   String global_buf_alert_msg;
   String global_buf_debug_msg;
@@ -365,6 +365,7 @@
       SASHA_GROUP       = 5,
       SLAVA_ARTEM_GROUP = 6,
       NOELE_GROUP       = 7,
+      RUHADZE_GROUP     = 8,
     };
   }
 
@@ -379,6 +380,7 @@
     class_users(USERS::SASHA_GROUP,       USER_ID5_Sasha_group,        false, false, false,      "Саша - группа"),            // Саша - айди группы //
     class_users(USERS::SLAVA_ARTEM_GROUP, USER_ID6_Slava_Artem_group,  false, false, false,      "Слава и Артем - группа"),   // Слава и Артём - айди группы //
     class_users(USERS::NOELE_GROUP,       USER_ID7_Noele_group,        false, false, false,      "Ноэль - группа"),           // Ноэль - айди группы //
+    class_users(USERS::RUHADZE_GROUP,     USER_ID8_Ruhadze_group,      false, false, false,      "Рухадзе - группа"),         // Рухадзе - айди группы //
   };
 
 
