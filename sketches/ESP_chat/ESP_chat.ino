@@ -124,9 +124,9 @@
 
       void _second_temp_request()                  // если датчик не прислал показания пробуем запросить еще раз. При Ошибке выдаёт -127.00 //
       {
-        for(int i = 0; _temp < -120 && i < 10 ; i++)
+        for(int i = 0; _temp < -120 && i < 6 ; i++)
         {
-          delay(100);
+          delay(500);
           _temp = ds.getTempC(_array_address);
         }
       }
