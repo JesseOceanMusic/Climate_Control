@@ -36,8 +36,8 @@
     public:
       class_ds18b20(bool alert_flag, byte ar0, byte ar1, byte ar2, byte ar3, byte ar4, byte ar5, byte ar6, byte ar7, String name, float crit_temp_high_error)  // конструктор класса //
       {
-        _crit_temp_low_alert = 1.0;
-        _crit_temp_low_error = -45.0;
+        _crit_temp_low_alert  = 0.0;
+        _crit_temp_low_error  = -45.0;
         _crit_temp_high_error = crit_temp_high_error;
 
         _alert_flag = alert_flag;
@@ -132,26 +132,26 @@
       }
   };
 
-  class_ds18b20 object_ds18b20_0(true, 0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43,  "Рекуператор Приток (in): ", 45);
+  class_ds18b20 object_ds18b20_0(true,  0x28, 0x76, 0x6A, 0x39, 0x0, 0x0, 0x0, 0x43, "Рекуператор Приток (in): ", 45);
   class_ds18b20 object_ds18b20_1(false, 0x28, 0x5C, 0x4E, 0x3C, 0x0, 0x0, 0x0, 0x5C, "Рекуператор Приток (out): ", 45);
   class_ds18b20 object_ds18b20_2(false, 0x28, 0xAD, 0x18, 0x3A, 0x0, 0x0, 0x0, 0x19, "Рекуператор Вытяжка (in): ", 45);
-  class_ds18b20 object_ds18b20_3(true, 0x28, 0x27, 0xB5, 0x3E, 0x0, 0x0, 0x0, 0xED,  "Рекуператор Вытяжка (out): ", 45);
+  class_ds18b20 object_ds18b20_3(true,  0x28, 0x27, 0xB5, 0x3E, 0x0, 0x0, 0x0, 0xED, "Рекуператор Вытяжка (out): ", 45);
   class_ds18b20 object_ds18b20_4(false, 0x28, 0xB6, 0x76, 0x39, 0x0, 0x0, 0x0, 0x81, "Воздуховод c Улицы: ", 45);
-  class_ds18b20 object_ds18b20_5(false, 0x28, 0xF, 0x2A, 0x3A, 0x0, 0x0, 0x0, 0x2C,  "Воздуховод с Батареи: ", 45);
+  class_ds18b20 object_ds18b20_5(false, 0x28, 0xF,  0x2A, 0x3A, 0x0, 0x0, 0x0, 0x2C, "Воздуховод с Батареи: ", 45);
   class_ds18b20 object_ds18b20_6(false, 0x28, 0x5E, 0x81, 0x39, 0x0, 0x0, 0x0, 0xFE, "Объединенный поток: ", 45);
   class_ds18b20 object_ds18b20_7(false, 0x28, 0x8C, 0x6B, 0x39, 0x0, 0x0, 0x0, 0x33, "Батарея: ", 105);
 
 /// ↓↓↓ Управление заслонками
 
   float temp_thermostat_target_for_air_dumpers = 23.0;     // температура термостата для режима заслонки //
-  float temp_thermostat_target_for_recuperator = 2.5;      // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
+  float temp_thermostat_target_for_recuperator =  1.0;     // температура термостата для режима рекуперации (чтобы предотвратить обмерзание) //
   float temp_thermostat_range                  = 0.15;     // чувствительность термостата //
-  int Step_Per_loop                            = 10;       // количество шагов двигателя за цикл запуска термостата //
+  int   Step_Per_loop                          =   10;     // количество шагов двигателя за цикл запуска термостата //
 
   bool use_recuperator;                            // флаг режима рекуператор/заслонки //
   #define recuperator_button A0                    // пин выключателя режима //
-  #define dir_UP   LOW                             // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
-  #define dir_DOWN HIGH                            // ↑↑↑ //
+  #define dir_UP             LOW                   // чтобы не путаться, поскольку low это 0 вольт, а high это 3,3 вольта //
+  #define dir_DOWN           HIGH                  // ↑↑↑ //
 
   const byte pin_DIR        = 16;    //D0          // общий пин для смены direction моторов. HIGH - Вниз , LOW - Вверх //
   const byte pin_knob_LOW   =  0;    //D3          // нижние концевики  //
@@ -172,9 +172,9 @@
   const int street_LOWEST_position_const = -2912;                                     // НИЖНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
   const int home_LOWEST_position_const   =  3188;                                     // ВЕРХНЯЯ точка плюс отступ (константа для проверки отклонения от первоначальных данных) //
 
-  const int street_low_space = 70;                                                    // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
+  const int street_low_space     = 70;                                                // отступ, чтобы нельзя было полностью закрыть заслонку с улицы и всегда был минимальный приток //
   int street_LOWEST_position_cur = street_LOWEST_position_const + street_low_space;   // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_home) //
-  int home_LOWEST_position_cur = home_LOWEST_position_const;                          // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
+  int home_LOWEST_position_cur   = home_LOWEST_position_const;                        // нижняя точка плюс отступ (выставляется после калибровки set_LOW_limit_street) //
 
 
   namespace air_dumpers_fast_change_position
