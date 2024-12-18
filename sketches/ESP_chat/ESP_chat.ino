@@ -125,10 +125,15 @@
       void _second_temp_request()                  // если датчик не прислал показания пробуем запросить еще раз. При Ошибке выдаёт -127.00 //
       {
         unsigned long millis_local_timer = millis();
-        while(_temp < -120 && millis() - millis_local_timer < 4000)
+        while(_temp < -120)
         {
           _temp = ds.getTempC(_array_address);
           delay(20);
+
+          if(millis() - millis_local_timer > 5000)
+          {
+            return;
+          }
         }
       }
   };
