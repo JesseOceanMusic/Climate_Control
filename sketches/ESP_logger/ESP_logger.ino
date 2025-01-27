@@ -6,7 +6,7 @@
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 //#define FB_USE_LOG Serial
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_012\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_013\Common_CODE.cpp"
 
 String SYNCdata;                                 // стринг для полученных данных из Serial Port //
 
@@ -45,7 +45,7 @@ String SYNCdata;                                 // стринг для полу
   int val_HSV_bra_night   = 0;                     // value (яркость) бра ночью //
   int val_HSV_line_night  = 0;                     // value (яркость) линии ночью //
   int val_HSV_clock_night = 1;                     // value (яркость) часов ночью //
-  byte RGB_clock_night [3] = {1, 1, 1,};           // цвет часов ночью. по умолчанию белый (white) 1,1,1,
+  byte RGB_clock_night [3] = {1, 1, 0,};           // цвет часов ночью. по умолчанию жёлтый (yellow) 1,1,0,
 
   int val_HSV_bra_cur     = val_HSV_bra_night;     // текущее значение яркости бра // нужно для плавного изменения яркости при изменение ночного режима по расписанию //
   int val_HSV_line_cur    = val_HSV_line_night;    // текущее значение яркости линии // ↑↑↑ //
@@ -408,6 +408,13 @@ String SYNCdata;                                 // стринг для полу
         break;
       }
     }
+  }
+
+  void set_clock_night_color(byte R_input, byte G_input, byte B_input)
+  {
+    RGB_clock_night [0] = R_input;
+    RGB_clock_night [1] = G_input;
+    RGB_clock_night [2] = B_input;
   }
 
   void LEDhello()                                  // индикация начала обработки команды из телеграма // 
@@ -1290,77 +1297,141 @@ String SYNCdata;                                 // стринг для полу
       case 112:                                                       // выбор цвета часов ночью //
       {
         String buf_message = "Выбор цвета часов ночью:";
-        buf_message += "\n\nКрасный - /11201";
-        buf_message += "\nЖелтый - /11202";
-        buf_message += "\nЗеленый - /11203";
-        buf_message += "\nГолубой - /11204";
-        buf_message += "\nСиний - /11205";
-        buf_message += "\nРозовый -/11206";
-        buf_message += "\n\nБелый - /11207";
+        buf_message += "\n\n/112100 - красный";
+        buf_message += "\n/112010 - зелёный";
+        buf_message += "\n/112001 - синий";
+
+        buf_message += "\n\n/112110 - жёлтый";
+        buf_message += "\n/112011 - лазурный";
+        buf_message += "\n/112101 - маджента";
+        
+        buf_message += "\n\n/112111 - белый";
+
+        buf_message += "\n\n/112211 - пудровый розовый";
+        buf_message += "\n/112121 - светло-бирюзовый";
+        buf_message += "\n/112112 - светло-васильковый";
+        
+        buf_message += "\n\n/112221 - светло-жёлтый";
+        buf_message += "\n/112122 - небесный светло-голубой";
+        buf_message += "\n/112212 - лавандовый розовый";
+
+        buf_message += "\n\n/112123 - небесный голубой";
+        buf_message += "\n/112223 - небесный пурпурный";
+        buf_message += "\n/112322 - нежный розовый";
+
         buf_message += "\n\n\nВвести вручную RGB цвет - /11299";
         object_array_users[users_array_index].send_message(buf_message);
         break;
       }
 
-      case 11201:                                                     // ↑↑↑ // Красный //
+      case 112100:                                                     // ↑↑↑ // Красный //
       {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 0;
-        RGB_clock_night [2] = 0;
+        set_clock_night_color(1, 0, 0);
         clock_master();
         break;
       }
 
-      case 11202:                                                     // ↑↑↑ // Желтый //
+      case 112010:                                                     // ↑↑↑ // Зеленый //
       {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 0;
+        set_clock_night_color(0, 1, 0);
         clock_master();
         break;
       }
 
-      case 11203:                                                     // ↑↑↑ // Зеленый //
+      case 112001:                                                     // ↑↑↑ // Синий //
       {
-        RGB_clock_night [0] = 0;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 0;
+        set_clock_night_color(0, 0, 1);
         clock_master();
         break;
       }
 
-      case 11204:                                                     // ↑↑↑ // Голубой //
+      case 112110:                                                     // ↑↑↑ // Желтый //
       {
-        RGB_clock_night [0] = 0;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 1;
+        set_clock_night_color(1, 1, 0);
         clock_master();
         break;
       }
 
-      case 11205:                                                     // ↑↑↑ // Синий //
+      case 112011:                                                     // ↑↑↑ // Лазурный //
       {
-        RGB_clock_night [0] = 0;
-        RGB_clock_night [1] = 0;
-        RGB_clock_night [2] = 1;
+        set_clock_night_color(0, 1, 1);
         clock_master();
         break;
       }
 
-      case 11206:                                                     // ↑↑↑ // Розовый //
+      case 112101:                                                     // ↑↑↑ // Маджента //
       {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 0;
-        RGB_clock_night [2] = 1;
+        set_clock_night_color(1, 0, 1);
         clock_master();
         break;
       }
 
-      case 11207:                                                     // ↑↑↑ // Белый //
+      case 112111:                                                     // ↑↑↑ // Белый //
       {
-        RGB_clock_night [0] = 1;
-        RGB_clock_night [1] = 1;
-        RGB_clock_night [2] = 1;
+        set_clock_night_color(1, 1, 1);
+        clock_master();
+        break;
+      }
+
+      case 112211:                                                     // ↑↑↑ // пудровый розовый //
+      {
+        set_clock_night_color(2, 1, 1);
+        clock_master();
+        break;
+      }
+
+      case 112121:                                                     // ↑↑↑ // светло-бирюзовый //
+      {
+        set_clock_night_color(1, 2, 1);
+        clock_master();
+        break;
+      }
+
+      case 112112:                                                     // ↑↑↑ // светло-васильковый //
+      {
+        set_clock_night_color(1, 1, 2);
+        clock_master();
+        break;
+      }
+
+      case 112221:                                                     // ↑↑↑ // светло-жёлтый //
+      {
+        set_clock_night_color(2, 2, 1);
+        clock_master();
+        break;
+      }
+
+      case 112122:                                                     // ↑↑↑ // небесный светло-голубой //
+      {
+        set_clock_night_color(1, 2, 2);
+        clock_master();
+        break;
+      }
+
+      case 112212:                                                     // ↑↑↑ // лавандовый розовый //
+      {
+        set_clock_night_color(2, 1, 2);
+        clock_master();
+        break;
+      }
+
+      case 112123:                                                     // ↑↑↑ // небесный голубой //
+      {
+        set_clock_night_color(1, 2, 3);
+        clock_master();
+        break;
+      }
+
+      case 112223:                                                     // ↑↑↑ // небесный пурпурный //
+      {
+        set_clock_night_color(2, 2, 3);
+        clock_master();
+        break;
+      }
+
+      case 112322:                                                     // ↑↑↑ // нежный розовый //
+      {
+        set_clock_night_color(3, 2, 2);
         clock_master();
         break;
       }

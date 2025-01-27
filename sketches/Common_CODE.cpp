@@ -537,13 +537,13 @@
 
     if (Message_is_it_known_user(CHAT_IDcur, income_message))
     {
-      byte dividerIndex_1 = income_message.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/back@JOArduinoChatBOT" //
+      byte dividerIndex_1 = income_message.indexOf('@');                              // ищем индекс разделителя @ // для того, чтобы работали команды из группы по запросу типа "/666@JOArduinoChatBOT" //
       String message_part_2 = income_message.substring(dividerIndex_1 + 1);           // записывает в message_part_2 "JOArduinoChatBOT" //
-      String message_part_1 = income_message.substring(0, dividerIndex_1);            // записывает в message_part_1 "/back" //
+      String message_part_1 = income_message.substring(0, dividerIndex_1);            // записывает в message_part_1 "/666" //
 
       if (message_part_2 != Opposite_bot_name)                                        // если сообщение не для него, то пропускает его //
       {
-        if(Message_is_it_back_command(message_part_1) == false)
+        if(Message_is_it_back_command(message_part_1) == false)                       // проверяет является ли сообщение "/back", если да, то обрабатывает его сразу.
         {
           if (object_array_users[users_array_index].get_message_state() != 1)         // если MessageState != 1, то значит ожидаем ввод данных //
           {
@@ -553,7 +553,7 @@
           else                                                                        // если MessageState == 1, то значит ожидаем команду //
           {
             byte dividerIndex_2 = message_part_1.indexOf('/');                        // ищем индекс разделителя "/" //
-            String buf_message_part_1 = message_part_1.substring(dividerIndex_2 + 1); // оставляем только команду "back" //
+            String buf_message_part_1 = message_part_1.substring(dividerIndex_2 + 1); // оставляем только команду "666" //
             int message_int = buf_message_part_1.toInt();
 
             Message_command_send_data(message_int);
