@@ -546,12 +546,8 @@
 
         if (_daily_calibrate_flag == true && object_TimeDate.get_TimeB() > 150101 && object_TimeDate.get_TimeB() < 152929)    // автоматическая калибровка раз в сутки в 14:01 //
         {
-          if(_doXsteps_counter != 0)                                             // если заслонки двигались хоть раз за пол дня - делаем калибровку //
-          {
-            motor_calibration::state = motor_calibration::quick;
-            object_array_users[USERS::ME].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 15:00 до 15:30).");
-          }
-
+          motor_calibration::state = motor_calibration::quick;
+          object_array_users[USERS::ME].send_message_second_chat("Отправил запрос на быструю калибровку по таймеру (раз в сутки в период с 15:00 до 15:30).");
           _daily_calibrate_flag = false;
         }
 
@@ -570,7 +566,7 @@
           _doXsteps_counter = 0;
         }
 
-        if (_step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)     // возвращает влаг обратно, чтобы отчет отправился на следующий день //
+        if (_step_counter_Flag == 0 && object_TimeDate.get_TimeB() < 234400)     // возвращает флаг обратно, чтобы отчет отправился на следующий день //
         {
           _step_counter_Flag = 1;
         }
