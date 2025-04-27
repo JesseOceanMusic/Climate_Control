@@ -6,7 +6,7 @@
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 //#define FB_USE_LOG Serial
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_013\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_014\Common_CODE.cpp"
 
 String SYNCdata;                                 // стринг для полученных данных из Serial Port //
 
@@ -31,8 +31,8 @@ String SYNCdata;                                 // стринг для полу
   int timer_min_hue_clock_cur = 0;                 // счетчик //
   int timer_min_hue_clock_target = 60;             // интервал смены цвета часов в минутах //
 
-  int hue_HSV_clock_day_random = 175;                  // hue (цвет) часов - меняется раз в час, чтобы не разражать. // пусть при запуске будет бирюзовым, раз в час цвет меняется //
-  int hue_HSV_bra_and_line_day_random;                 // переменная, которая хранит значение последнего случайного hue (цвет) //
+  int hue_HSV_clock_day_random = 175;              // hue (цвет) часов - меняется раз в час, чтобы не разражать. // пусть при запуске будет бирюзовым, раз в час цвет меняется //
+  int hue_HSV_bra_and_line_day_random;             // переменная, которая хранит значение последнего случайного hue (цвет) //
 
   int val_HSV_bra_day     = 80;                    // value (яркость) бра днём // 
   int val_HSV_line_day    = 40;                    // value (яркость) линии днём //
@@ -52,6 +52,7 @@ String SYNCdata;                                 // стринг для полу
   int val_HSV_clock_cur   = val_HSV_clock_night;   // текущее значение яркости часов // ↑↑↑ //
 
   bool global_ERROR_flag = false;                  // Флаг для ошибок (1 - нет ошибок, 2 - в цикле были ошибки) // ps в какой-то момент появилось подозрение, что где-то в биоблетаках уже есть ErrorSTATE и возникают ошибки //
+  bool ERROR_animation_manual_off = false;         // Отключение анимации ошибок вручную через команду //
 
   void FillSolidMY()                               // заливка, чтобы не ждать при изменение яркости и дневного/ночного режима через команду //
   {
@@ -595,8 +596,9 @@ String SYNCdata;                                 // стринг для полу
   // шестой сегмент - нижний-правый. //
   // седьмой сегмент - верхный-правый. //
 
-  byte ClockArray_main [Clock_Leds_Amount];                // основной массив для отображения данных (результат сложения 13 цифр + точка, двоеточие, процент) //
+  byte ClockArray_main [Clock_Leds_Amount];        // основной массив для отображения данных (результат сложения 13 цифр + точка, двоеточие, процент) //
   byte ArrayGlobalCounter = 0;                     // счетчик для сложения массивов //
+  bool clock_halfLED_turn_off = true;              // выключиет половину светодиодов в цифрах, чтобы снизить яркость //
 
   class class_Clock                                // класс часов //
   {
@@ -622,6 +624,14 @@ String SYNCdata;                                 // стринг для полу
 
           buf_array [i*2] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
           buf_array [(i*2)+1] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
+
+          if (clock_halfLED_turn_off == true && _array_length == 14)                                         // если включён режим половины светодиодов и это цифра, а не двоеточие/процент/точка //
+          {
+            if (object_NightTime.get_NightTimeState() == 2 || object_NightTime.get_NightTimeState() == 4)    // если влючен ночной режим//
+            {
+              buf_array [(i*2)+1] = 0;
+            }
+          }
         }
 
         for (int i = 0; i < _array_length; i++)              // полученный результат переносим в основной массив ClockArray_main, чтобы при вызове следующих объектов сохранить индекс - храним его в ArrayGlobalCounter //
@@ -680,10 +690,10 @@ String SYNCdata;                                 // стринг для полу
   class_Clock object_clock_11 (4, 14);             // время //
   class_Clock object_clock_12 (4, 14);             // время //
 
-  bool clock_night_indication_time = true;         // флаг отображаем/не отображаем ВРЕМЯ ночью на табло // 
-  bool clock_night_indication_co2 = true;          // ↑↑↑ // СО2 //
-  bool clock_night_indication_temperature = true;  // ↑↑↑ // температура //
-  bool clock_night_indication_humidity = true;     // ↑↑↑ // влажность //
+  bool clock_night_indication_time = true;         // флаг отображаем/не отображаем ночью на табло // ВРЕМЯ // 
+  bool clock_night_indication_co2 = false;         // ↑↑↑ // СО2 //
+  bool clock_night_indication_temperature = false; // ↑↑↑ // температура //
+  bool clock_night_indication_humidity = false;    // ↑↑↑ // влажность //
 
   void clock_master()                              // мастер функция для часов вызывающая другие функции и методы. //
   {
@@ -942,7 +952,7 @@ String SYNCdata;                                 // стринг для полу
     }
   }
 
-  String clock_indication()                        // отображение текущего состояния отображения данных на табло в текстовом виде //
+  String clock_indication()                      // отображение текущего состояния отображения данных на табло в текстовом виде //
   {
     String buf_time_message;
     String buf_co2_message;
@@ -1083,7 +1093,7 @@ String SYNCdata;                                 // стринг для полу
 
 /// ↓↓↓ Телеграм
 
-  void Message_command_get_data(String text)       // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
+  void Message_command_get_data(String text)     // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
   {
     jesse_yield_func();
 
@@ -1158,7 +1168,7 @@ String SYNCdata;                                 // стринг для полу
     object_array_users[users_array_index].set_message_state(1);
   }
 
-  void Message_command_send_data(int text_int)      // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
+  void Message_command_send_data(int text_int)   // вызывается из Common CODE файла, из функции Message_from_Telegram_converter() //
   {
     jesse_yield_func();
 
@@ -1443,6 +1453,39 @@ String SYNCdata;                                 // стринг для полу
         break;
       }
 
+      case 113:                                                       // ВКЛ/ВЫКЛ режим halfLED //
+      {
+        clock_halfLED_turn_off = !clock_halfLED_turn_off;
+
+        if (clock_halfLED_turn_off == true)
+        {
+          object_array_users[users_array_index].send_message("Включён режим halfLED ночью");
+        }
+        else
+        {
+          object_array_users[users_array_index].send_message("Отключен режим halfLED ночью");
+        }
+
+        clock_master();
+        break;
+      }
+
+      case 180:                                                       // ВКЛ/ВЫКЛ ERROR анимации //
+      {
+        ERROR_animation_manual_off = !ERROR_animation_manual_off;
+        
+        if (ERROR_animation_manual_off == true)
+        {
+          object_array_users[users_array_index].send_message("Отключена Анимация ошибок днём (ночью всегда отключена)");
+        }
+        else
+        {
+          object_array_users[users_array_index].send_message("Включена Анимация ошибок днём (ночью всегда отключена)");
+        }
+
+        break;
+      }
+
       case 190:                                                       // ВКЛ/ВЫКЛ Текстовых уведомлений //
       {
         object_array_users[users_array_index].set_alert_flag();
@@ -1595,7 +1638,7 @@ String SYNCdata;                                 // стринг для полу
 
     if (global_ERROR_flag == true && Animation::state == Animation::NONE)        // проверят были ли ошибки и если были - делает анимацию //
     {
-      if (object_NightTime.get_NightTimeState() == 1)                            // 1 значит - днём можно включить ночной режим, чтобы отключить анимацию ошибки во время отладки // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл до след вечера //
+      if (object_NightTime.get_NightTimeState() == 1 && ERROR_animation_manual_off == false)  // 1 значит - днём можно включить ночной режим, чтобы отключить анимацию ошибки во время отладки // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл до след вечера //
       {    
         Animation::state = Animation::ERROR_PART_0;                              // если были ошибки и сейчас день, без включенного ночного режима - запускаем анимацию ошибки //
       }

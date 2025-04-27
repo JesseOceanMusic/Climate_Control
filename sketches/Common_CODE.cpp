@@ -1,4 +1,170 @@
-/// ↓↓↓ StopWatch
+/// ↓↓↓ yield
+
+  void jesse_yield_func()
+  {
+    #ifdef Jesse_yield_enable
+      yield();
+    #endif
+  }
+
+/// ↓↓↓ Время
+
+  class class_TimeDate                                     // класс Даты и Времени //
+  {
+    public:
+      class_TimeDate()                             // конструктор класса //
+      {
+        _UTC_time = 0;
+      }
+
+      void update_TimeDate()                       // обновление текущей даты и времени
+      {
+        jesse_yield_func();
+
+        if(millis() - _millis_timer_for_update > 200)   // чтобы не обновлять время чаще чем раз в 200мс //
+        {
+          _UTC_time = time(nullptr);
+          struct tm* L_tm = localtime(&_UTC_time);
+
+          String buf_Date_YEAR = String(L_tm->tm_year + 1900);
+          String buf_Date_MONTH = String(L_tm->tm_mon + 1);
+          String buf_Date_DAY = String(L_tm->tm_mday);
+          String buf_Time_HOUR = String(L_tm->tm_hour);
+          String buf_Time_MIN = String(L_tm->tm_min);
+          String buf_Time_SEC = String(L_tm->tm_sec);
+
+          _TimeHOUR = buf_Time_HOUR.toInt();
+          _TimeMIN = buf_Time_MIN.toInt();
+          _TimeSEC = buf_Time_SEC.toInt();
+
+          if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
+          {
+            buf_Date_MONTH = String("0" + buf_Date_MONTH);
+          }
+
+          if (buf_Date_DAY.toInt() >= 0 && buf_Date_DAY.toInt() < 10)
+          {
+            buf_Date_DAY = String("0" + buf_Date_DAY);
+          }
+
+          if (buf_Time_HOUR.toInt() >= 0 && buf_Time_HOUR.toInt() < 10)
+          {
+            buf_Time_HOUR = String("0" + buf_Time_HOUR);
+          }
+
+          if (buf_Time_MIN.toInt() >= 0 && buf_Time_MIN.toInt() < 10)
+          {
+            buf_Time_MIN = String ("0" + buf_Time_MIN);
+          }
+
+          if (buf_Time_SEC.toInt() >= 0 && buf_Time_SEC.toInt() < 10)
+          {
+            buf_Time_SEC = String ("0" + buf_Time_SEC);
+          }
+
+          _DateMONTH = buf_Date_MONTH.toInt();
+          _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
+          _TimeA = String(buf_Time_HOUR + ":" + buf_Time_MIN + ":" + buf_Time_SEC);
+          String buf_TimeB = String(buf_Time_HOUR + buf_Time_MIN + buf_Time_SEC);
+          _TimeB = buf_TimeB.toInt();
+          _DateTimeFULL = String(_DateFULL + " " + _TimeA);
+
+          _millis_timer_for_update = millis();
+        }
+      }
+
+      void set_UTC_time()
+      {
+        configTime(10800, 0, "pool.ntp.org");            // get UTC time via NTP // не работает - "time.nist.gov" //
+
+        while (1717656000 > _UTC_time || _UTC_time > 4102444800)                  // не начинаем основной луп, пока не получим время //
+        {
+          _UTC_time = time(nullptr);
+          delay (500);
+        }
+
+        _UTC_boot = _UTC_time;
+      }
+
+      time_t get_UTC()
+      {
+        return(_UTC_time);
+      }
+
+      time_t get_UTC_boot()
+      {
+        return(_UTC_boot);
+      }
+
+
+      byte get_HOUR()
+      {
+        return(_TimeHOUR);
+      }
+
+      byte get_MIN()
+      {
+        return(_TimeMIN);
+      }
+
+      byte get_SEC()
+      {
+        return(_TimeSEC);
+      }
+
+      String get_DateFULL()
+      {
+        return(_DateFULL);
+      }
+
+      String get_DateTimeFULL()
+      {
+        return(_DateTimeFULL);
+      }
+
+      String get_TimeA()
+      {
+        return(_TimeA);
+      }
+
+      long get_TimeB()
+      {
+        return(_TimeB);
+      }
+
+      byte get_DateMONTH()
+      {
+        return(_DateMONTH);
+      }
+      
+      bool get_FLAG_minute()
+      {
+        return(_flag_every_minute_timer);
+      }
+
+    private:
+      time_t _UTC_time;                            // Время в секундах //
+      time_t _UTC_boot;                 // Время начало работы программы //
+      bool _flag_every_minute_timer = false;       // Флаг для таймера каждую четную/нечетную минуту // true - четная // false - нечетная //
+
+      unsigned long _millis_timer_for_update;
+      byte _TimeHOUR;                              // часы //
+      byte _TimeMIN;                               // минуты //
+      byte _TimeSEC;                               // секунды //
+      
+      byte _DateMONTH;                             // месяц //
+
+      String _DateFULL;                            //дата в формате 2024-06-24 //
+      String _DateTimeFULL;                        //дата и время в формате 2024-06-24 11:48:39 //
+      String _TimeA;                               //время в формате 22:01:02 //
+      long _TimeB;                                 //время в формате 220102 //
+  };
+
+  class_TimeDate object_TimeDate;                          // создаем экземпляр класса class_TimeDate (объект) //
+
+  bool flag_every_minute_timer = false;                    // флаг для таймера каждую четную/нечетную минуту //   
+
+/// ↓↓↓ StopWatch (для дебаггера)
 
   class class_stopwatch_ms
   {
@@ -15,7 +181,7 @@
 
       void start()
       {
-        _last_timestamp = millis();
+        _last_millis_stamp = millis();
       }
 
       void stop()
@@ -42,8 +208,8 @@
         {
           if(_is_it_loop == true)
           {
-            unsigned int elapsed_time_in_ms = millis() - _start_timestamp;
-            float avg = (float)elapsed_time_in_ms / (float)_iteretion_counter;
+            time_t elapsed_time_in_sec = object_TimeDate.get_UTC() - object_TimeDate.get_UTC_boot();
+            float avg = ((float)elapsed_time_in_sec / (float)_iteretion_counter) * 1000;
             return avg;
           }
           else
@@ -57,10 +223,12 @@
 
       String get_string_info()
       {
-        const unsigned long elapsed_time_ms  = millis() - _start_timestamp;
-        const unsigned int elapsed_time_sec  = elapsed_time_ms / 1000 % 60;
-        const unsigned int elapsed_time_min  = elapsed_time_ms / 1000 / 60 % 60;
-        const unsigned int elapsed_time_hour = elapsed_time_ms / 1000 / 60 / 60;
+        time_t elapsed_time_in_sec = object_TimeDate.get_UTC() - object_TimeDate.get_UTC_boot();
+
+        time_t elapsed_time_sec  = elapsed_time_in_sec % 60;
+        time_t elapsed_time_min  = elapsed_time_in_sec / 60 % 60;
+        time_t elapsed_time_hour = elapsed_time_in_sec / 60 / 60;
+
         String buf_info  = String(_name) + " " + String(elapsed_time_hour) + ":" + String(elapsed_time_min) + ":" + String(elapsed_time_sec) + "\n";
 
         if(_calculate_low_flag == true)
@@ -91,25 +259,26 @@
         return buf_info;
       }
 
-      void reset()
-      {
-        _low = 999999;
-        _max = 0;
-        _iteretion_counter = 0;
-        _loop_length_sum_for_avg = 0;
-        for(int i = 0; i < _high_limit_array_length; i++)
+      /*
+        void reset()
         {
-          _high_limit_counter_array [i] = 0;
+          _low = 999999;
+          _max = 0;
+          _iteretion_counter = 0;
+          _loop_length_sum_for_avg = 0;
+          for(int i = 0; i < _high_limit_array_length; i++)
+          {
+            _high_limit_counter_array [i] = 0;
+          }
+          _start_UTC_timestamp = object_TimeDate.get_UTC();
         }
-        _start_timestamp = millis();
-      }
+      */
 
     private:
       String _name;
       bool _is_it_loop;
 
-      unsigned long _start_timestamp;
-      unsigned long _last_timestamp;
+      unsigned long _last_millis_stamp;
 
       bool _calculate_low_flag;
       unsigned int _low = 999999;
@@ -122,17 +291,17 @@
       unsigned int _loop_length_sum_for_avg;
 
       bool _count_above_limit;
-      const byte _high_limit_array_length = 13;
-      const unsigned int _high_limit_array [13] = {50, 100, 150, 300, 500, 1000, 1500, 2000, 3000, 5000, 10000, 15000, 20000, };
-      unsigned int _high_limit_counter_array [13];
+      const static byte _high_limit_array_length = 15;
+      const unsigned int _high_limit_array [_high_limit_array_length] = {10, 50, 100, 200, 400, 700, 1000, 1500, 2000, 6000, 10000, 15000, 20000, 30000, 50000};
+      unsigned int _high_limit_counter_array [_high_limit_array_length];
 
       void f_calcilate_low()
       {
         if(_calculate_low_flag == true)
         {
-          if(_low > millis() - _last_timestamp)
+          if(_low > millis() - _last_millis_stamp)
           {
-            _low = millis() - _last_timestamp;
+            _low = millis() - _last_millis_stamp;
           }
         }
       }
@@ -141,9 +310,9 @@
       {
         if(_calculate_max_flag == true)
         {
-          if(_max < millis() - _last_timestamp)
+          if(_max < millis() - _last_millis_stamp)
           {
-            _max = millis() - _last_timestamp;
+            _max = millis() - _last_millis_stamp;
           }
         }
       }
@@ -155,14 +324,14 @@
           _iteretion_counter++;
           if(_is_it_loop == false)
           {
-            _loop_length_sum_for_avg += (millis() - _last_timestamp);
+            _loop_length_sum_for_avg += (millis() - _last_millis_stamp);
           }
         }
       }
 
       void f_check_high_limit()
       {
-        const unsigned int elapsed_time = millis() - _last_timestamp;
+        const unsigned int elapsed_time = millis() - _last_millis_stamp;
         for (int i = 0; i < _high_limit_array_length; i++)
         {
           if(elapsed_time > _high_limit_array[i])
@@ -204,13 +373,6 @@
     const String This_bot_name     = "JOArduinoLogsBOT";
     const String Opposite_bot_name = "JOArduinoChatBOT";
   #endif
-
-  void jesse_yield_func()
-  {
-    #ifdef Jesse_yield_enable
-      yield();
-    #endif
-  }
 
   bool message_intruder_flag = true;
   byte users_array_index;
@@ -629,153 +791,6 @@
     is_there_an_alert_or_debug_to_send(can_i_send_message_flag);
   }
 
-/// ↓↓↓ Время
-
-  class class_TimeDate                                     // класс Даты и Времени //
-  {
-    public:
-      class_TimeDate()                             // конструктор класса //
-      {
-        _UTC_time = 0;
-      }
-
-      void update_TimeDate()                       // обновление текущей даты и времени
-      {
-        jesse_yield_func();
-
-        if(millis() - _millis_timer_for_update > 200)   // чтобы не обновлять время чаще чем раз в 200мс //
-        {
-          _UTC_time = time(nullptr);
-          struct tm* L_tm = localtime(&_UTC_time);
-
-          String buf_Date_YEAR = String(L_tm->tm_year + 1900);
-          String buf_Date_MONTH = String(L_tm->tm_mon + 1);
-          String buf_Date_DAY = String(L_tm->tm_mday);
-          String buf_Time_HOUR = String(L_tm->tm_hour);
-          String buf_Time_MIN = String(L_tm->tm_min);
-          String buf_Time_SEC = String(L_tm->tm_sec);
-
-          _TimeHOUR = buf_Time_HOUR.toInt();
-          _TimeMIN = buf_Time_MIN.toInt();
-          _TimeSEC = buf_Time_SEC.toInt();
-
-          if (buf_Date_MONTH.toInt() >= 0 && buf_Date_MONTH.toInt() < 10)
-          {
-            buf_Date_MONTH = String("0" + buf_Date_MONTH);
-          }
-
-          if (buf_Date_DAY.toInt() >= 0 && buf_Date_DAY.toInt() < 10)
-          {
-            buf_Date_DAY = String("0" + buf_Date_DAY);
-          }
-
-          if (buf_Time_HOUR.toInt() >= 0 && buf_Time_HOUR.toInt() < 10)
-          {
-            buf_Time_HOUR = String("0" + buf_Time_HOUR);
-          }
-
-          if (buf_Time_MIN.toInt() >= 0 && buf_Time_MIN.toInt() < 10)
-          {
-            buf_Time_MIN = String ("0" + buf_Time_MIN);
-          }
-
-          if (buf_Time_SEC.toInt() >= 0 && buf_Time_SEC.toInt() < 10)
-          {
-            buf_Time_SEC = String ("0" + buf_Time_SEC);
-          }
-
-          _DateMONTH = buf_Date_MONTH.toInt();
-          _DateFULL = String(buf_Date_YEAR + "-" + buf_Date_MONTH + "-" + buf_Date_DAY);
-          _TimeA = String(buf_Time_HOUR + ":" + buf_Time_MIN + ":" + buf_Time_SEC);
-          String buf_TimeB = String(buf_Time_HOUR + buf_Time_MIN + buf_Time_SEC);
-          _TimeB = buf_TimeB.toInt();
-          _DateTimeFULL = String(_DateFULL + " " + _TimeA);
-
-          _millis_timer_for_update = millis();
-        }
-      }
-
-      void set_UTC_time()
-      {
-        configTime(10800, 0, "pool.ntp.org");            // get UTC time via NTP // не работает - "time.nist.gov" //
-
-        while (1717656000 > _UTC_time || _UTC_time > 4102444800)                  // не начинаем основной луп, пока не получим время //
-        {
-          _UTC_time = time(nullptr);
-          delay (500);
-        }
-      }
-
-      time_t get_UTC()
-      {
-        return(_UTC_time);
-      }
-
-      byte get_HOUR()
-      {
-        return(_TimeHOUR);
-      }
-
-      byte get_MIN()
-      {
-        return(_TimeMIN);
-      }
-
-      byte get_SEC()
-      {
-        return(_TimeSEC);
-      }
-
-      String get_DateFULL()
-      {
-        return(_DateFULL);
-      }
-
-      String get_DateTimeFULL()
-      {
-        return(_DateTimeFULL);
-      }
-
-      String get_TimeA()
-      {
-        return(_TimeA);
-      }
-
-      long get_TimeB()
-      {
-        return(_TimeB);
-      }
-
-      byte get_DateMONTH()
-      {
-        return(_DateMONTH);
-      }
-      
-      bool get_FLAG_minute()
-      {
-        return(_flag_every_minute_timer);
-      }
-
-    private:
-      time_t _UTC_time;                            // Время в секундах //
-      bool _flag_every_minute_timer = false;       // Флаг для таймера каждую четную/нечетную минуту // true - четная // false - нечетная //
-
-      unsigned long _millis_timer_for_update;
-      byte _TimeHOUR;                              // часы //
-      byte _TimeMIN;                               // минуты //
-      byte _TimeSEC;                               // секунды //
-      
-      byte _DateMONTH;                             // месяц //
-
-      String _DateFULL;                            //дата в формате 2024-06-24 //
-      String _DateTimeFULL;                        //дата и время в формате 2024-06-24 11:48:39 //
-      String _TimeA;                               //время в формате 22:01:02 //
-      long _TimeB;                                 //время в формате 220102 //
-  };
-
-  class_TimeDate object_TimeDate;                          // создаем экземпляр класса class_TimeDate (объект) //
-
-  bool flag_every_minute_timer = false;                    // флаг для таймера каждую четную/нечетную минуту //   
 
 /// ↓↓↓ Restart
 
