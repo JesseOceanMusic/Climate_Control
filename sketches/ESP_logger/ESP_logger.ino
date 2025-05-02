@@ -1047,7 +1047,7 @@ String SYNCdata;                                 // стринг для полу
 
   void log_read_and_send(bool is_it_timer)
   {
-    obj_stopwatch_ms_send_log.start();
+    obj_stopwatch_ms_Send_Log.start();
     if (!SD.begin(4))
     {
       send_alert("ERROR: Ошибка инициализации SD карты");
@@ -1088,7 +1088,7 @@ String SYNCdata;                                 // стринг для полу
     {
       send_alert("ERROR: Ошибка чтения SD карты");
     }
-    obj_stopwatch_ms_send_log.stop();
+    obj_stopwatch_ms_Send_Log.stop();
   }
 
 /// ↓↓↓ Телеграм
@@ -1626,7 +1626,7 @@ String SYNCdata;                                 // стринг для полу
 
   void loop()                                                      // основной луп //
   {
-    obj_stopwatch_ms_loop.start();                                 // для подсчета времени лупа //
+    obj_stopwatch_ms_Main_LOOP.start();                                 // для подсчета времени лупа //
 
     heap_control();
 
@@ -1665,5 +1665,5 @@ String SYNCdata;                                 // стринг для полу
       flag_every_minute_timer = false;
     }
 
-    obj_stopwatch_ms_loop.stop();
+    obj_stopwatch_ms_Main_LOOP.stop();
   }

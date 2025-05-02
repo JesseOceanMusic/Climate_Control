@@ -169,56 +169,26 @@
   class class_stopwatch_ms
   {
     public: 
-      class_stopwatch_ms(String name, bool calculate_low, bool calculate_max, bool calculate_avg, bool count_above_limit, bool is_it_loop)
+      class_stopwatch_ms(String name)
       {
         _name = name;
-        _calculate_low_flag = calculate_low;
-        _calculate_max_flag = calculate_max;
-        _calculate_avg_flag = calculate_avg;
-        _count_above_limit = count_above_limit;
-        _is_it_loop = is_it_loop;
       }
 
       void start()
       {
-        _last_millis_stamp = millis();
-      }
+        _START_millis_stamp_ms = millis();
+      }      
 
       void stop()
       {
-        f_calcilate_low();
-        f_calculate_max();
-        f_calculate_avg();
-        f_check_high_limit();
-      }
-
-      unsigned int get_low()
-      {
-        return _low;
-      }
-
-      unsigned int get_max()
-      {
-        return _max;
-      }
-
-      float get_avg()
-      {
-        if(_iteretion_counter > 0)
+        if(_START_millis_stamp_ms <= millis())
         {
-          if(_is_it_loop == true)
-          {
-            time_t elapsed_time_in_sec = object_TimeDate.get_UTC() - object_TimeDate.get_UTC_boot();
-            float avg = ((float)elapsed_time_in_sec / (float)_iteretion_counter) * 1000;
-            return avg;
-          }
-          else
-          {
-            float avg = (float)_loop_length_sum_for_avg / (float)_iteretion_counter;
-            return avg;
-          }
+          _iteration_counter++;
+          _stopwatch_total_sum_µs += (millis() - _START_millis_stamp_ms) * 1000;
+
+          f_calculate_max();
+          f_high_limit_counter();
         }
-        return 0;
       }
 
       String get_string_info()
@@ -229,112 +199,74 @@
         time_t elapsed_time_min  = elapsed_time_in_sec / 60 % 60;
         time_t elapsed_time_hour = elapsed_time_in_sec / 60 / 60;
 
-        String buf_info  = String(_name) + " " + String(elapsed_time_hour) + ":" + String(elapsed_time_min) + ":" + String(elapsed_time_sec) + "\n";
+        String buf_info  = "**" + String(_name) + "**" + "\nUPTIME: " + String(elapsed_time_hour) + ":" + String(elapsed_time_min) + ":" + String(elapsed_time_sec) + "\n";
 
-        if(_calculate_low_flag == true)
+        if (_iteration_counter != 0)
         {
-          buf_info += "low: " + String(_low) + " ms.\n";
-        }
+          buf_info += "max: " + String(_max) + " ms.\n";
+          f_calculate_avg();
+          buf_info += "avg: " + String(_avg) + " ms.\n";
 
-        if(_calculate_avg_flag == true)
-        {
-          buf_info += "avg: " + String(get_avg()) + " ms.\n";
-        }
-        if(_count_above_limit == true)
-        {
-          buf_info += "\n";
-          for (int i = 0; i < _high_limit_array_length; i++)
+          buf_info += "\nThreshholds:\n";
+          buf_info += "total: " + String(_iteration_counter) + "\n";
+
+          for (int i = 0; i < _high_limit_array_ms_length; i++)
           {
-            buf_info += "above" + String(_high_limit_array[i]) + ": ";
-            buf_info += String(_high_limit_counter_array[i]) + "\n";
+            if(_high_limit_counter_array[i] != 0)
+            {
+              buf_info += "above " + String(_high_limit_array_ms[i]) + "ms" + ": ";
+              buf_info += String(_high_limit_counter_array[i]);
+
+              float percentage = (float)_high_limit_counter_array[i] / (float)_iteration_counter * 100.0f;
+              buf_info += " (" + String(percentage, 6) + "%)\n" ;
+            }
           }
-          buf_info += "\n";
         }
 
-        if(_calculate_max_flag == true)
+        else
         {
-          buf_info += "max: " + String(_max) + " ms.\n\n";
+          buf_info += "Нет данных.\n";
         }
 
+        buf_info += "\n";
         return buf_info;
       }
 
-      /*
-        void reset()
-        {
-          _low = 999999;
-          _max = 0;
-          _iteretion_counter = 0;
-          _loop_length_sum_for_avg = 0;
-          for(int i = 0; i < _high_limit_array_length; i++)
-          {
-            _high_limit_counter_array [i] = 0;
-          }
-          _start_UTC_timestamp = object_TimeDate.get_UTC();
-        }
-      */
-
     private:
       String _name;
-      bool _is_it_loop;
 
-      unsigned long _last_millis_stamp;
-
-      bool _calculate_low_flag;
-      unsigned int _low = 999999;
-
-      bool _calculate_max_flag;
       unsigned int _max = 0;
+      float _avg;
 
-      bool _calculate_avg_flag;
-      unsigned int _iteretion_counter = 0;
-      unsigned int _loop_length_sum_for_avg;
+      uint64_t _iteration_counter = 0;                                                   // избежать деление на 0
+      unsigned long _START_millis_stamp_ms;
+      uint64_t _stopwatch_total_sum_µs;
 
-      bool _count_above_limit;
-      const static byte _high_limit_array_length = 15;
-      const unsigned int _high_limit_array [_high_limit_array_length] = {10, 50, 100, 200, 400, 700, 1000, 1500, 2000, 6000, 10000, 15000, 20000, 30000, 50000};
-      unsigned int _high_limit_counter_array [_high_limit_array_length];
-
-      void f_calcilate_low()
-      {
-        if(_calculate_low_flag == true)
-        {
-          if(_low > millis() - _last_millis_stamp)
-          {
-            _low = millis() - _last_millis_stamp;
-          }
-        }
-      }
+      const static byte _high_limit_array_ms_length = 16;
+      const unsigned int _high_limit_array_ms [_high_limit_array_ms_length] = {5, 10, 50, 100, 200, 400, 700, 1000, 1500, 2000, 6000, 10000, 15000, 20000, 30000, 60000};
+      unsigned int _high_limit_counter_array [_high_limit_array_ms_length]  = {0, 0,  0,  0,   0,   0,   0,   0,    0,    0,    0,    0,     0,     0,     0,     0};      // обнуляет все значения, чтобы не было мусорных значений.
 
       void f_calculate_max()
       {
-        if(_calculate_max_flag == true)
+        if(_max < millis() - _START_millis_stamp_ms)
         {
-          if(_max < millis() - _last_millis_stamp)
-          {
-            _max = millis() - _last_millis_stamp;
-          }
-        }
+          _max = millis() - _START_millis_stamp_ms;
+        }        
       }
 
       void f_calculate_avg()
       {
-        if(_calculate_avg_flag == true)
-        {
-          _iteretion_counter++;
-          if(_is_it_loop == false)
-          {
-            _loop_length_sum_for_avg += (millis() - _last_millis_stamp);
-          }
-        }
+        unsigned int _avg_µs = _stopwatch_total_sum_µs / _iteration_counter;
+        _avg = (float)_avg_µs / 1000.0f;
       }
 
-      void f_check_high_limit()
+      void f_high_limit_counter()
       {
-        const unsigned int elapsed_time = millis() - _last_millis_stamp;
-        for (int i = 0; i < _high_limit_array_length; i++)
+        unsigned int elapsed_time = millis() - _START_millis_stamp_ms;
+
+        for (int i = 0; i < _high_limit_array_ms_length; i++)
         {
-          if(elapsed_time > _high_limit_array[i])
+          if(elapsed_time > _high_limit_array_ms[i])
           {
             _high_limit_counter_array[i]++;
           }
@@ -342,11 +274,11 @@
       }
   };
 
-  class_stopwatch_ms obj_stopwatch_ms_loop       ("LOOP",       false, true, true, true,  true);
-  class_stopwatch_ms obj_stopwatch_ms_bot_tick   ("TICK",       false, true, false, true, false);
+  class_stopwatch_ms obj_stopwatch_ms_Main_LOOP ("Main_LOOP");
+  class_stopwatch_ms obj_stopwatch_ms_Telegram_TICK ("Telegram_TICK");
 
   #ifdef THIS_IS_LOGGER_CODE
-    class_stopwatch_ms obj_stopwatch_ms_send_log ("SEND LOG",   false, true, false, true, false);
+    class_stopwatch_ms obj_stopwatch_ms_Send_Log ("Send_LOG");
   #endif
 
 /// ↓↓↓ Телеграм
@@ -773,7 +705,7 @@
     static unsigned long timer_for_tick_ms;
     bool can_i_send_message_flag = false;
 
-    obj_stopwatch_ms_bot_tick.start();
+    obj_stopwatch_ms_Telegram_TICK.start();
     if(millis() - timer_for_tick_ms > 5)
     {
       if(bot_main.tick() == true)
@@ -785,7 +717,7 @@
       }
       timer_for_tick_ms = millis();
     }
-    obj_stopwatch_ms_bot_tick.stop();
+    obj_stopwatch_ms_Telegram_TICK.stop();
 
     check_timer_for_sending_debug_report();
     is_there_an_alert_or_debug_to_send(can_i_send_message_flag);
@@ -929,23 +861,23 @@
 
   void debug_report_constructor()
   {
-    global_buf_debug_msg  = obj_stopwatch_ms_loop.get_string_info();
-    global_buf_debug_msg += obj_stopwatch_ms_bot_tick.get_string_info();
+    global_buf_debug_msg  = obj_stopwatch_ms_Main_LOOP.get_string_info();
+    global_buf_debug_msg += obj_stopwatch_ms_Telegram_TICK.get_string_info();
     #ifdef THIS_IS_LOGGER_CODE
-      global_buf_debug_msg += obj_stopwatch_ms_send_log.get_string_info();
+      global_buf_debug_msg += obj_stopwatch_ms_Send_Log.get_string_info();
     #endif
 
     global_buf_debug_msg += "FREE HEAP:\n";
-    global_buf_debug_msg += "after30min:"   + String(free_heap::after_30_min)   + " bytes.\n";
-    global_buf_debug_msg += "after60min:"   + String(free_heap::after_60_min)   + " bytes.\n";
-    global_buf_debug_msg += "after6hours:"  + String(free_heap::after_6_hours)  + " bytes.\n";
-    global_buf_debug_msg += "after12hours:" + String(free_heap::after_12_hours) + " bytes.\n";
-    global_buf_debug_msg += "after1day:"    + String(free_heap::after_24_hours) + " bytes.\n";
-    global_buf_debug_msg += "after2days:"   + String(free_heap::after_2_days)   + " bytes.\n";
-    global_buf_debug_msg += "after3days:"   + String(free_heap::after_3_days)   + " bytes.\n";
-    global_buf_debug_msg += "after4days:"   + String(free_heap::after_4_days)   + " bytes.\n\n";
-    global_buf_debug_msg += "lowest:"       + String(free_heap::lowest)           + " bytes.\n";
-    global_buf_debug_msg += "now: "         + String(ESP.getFreeHeap())         + " bytes.";
+    if(free_heap::after_30_min != 0)   {global_buf_debug_msg += "after30min:"   + String(free_heap::after_30_min)   + " bytes.\n";}
+    if(free_heap::after_60_min != 0)   {global_buf_debug_msg += "after60min:"   + String(free_heap::after_60_min)   + " bytes.\n";}
+    if(free_heap::after_6_hours != 0)  {global_buf_debug_msg += "after6hours:"  + String(free_heap::after_6_hours)  + " bytes.\n";}
+    if(free_heap::after_12_hours != 0) {global_buf_debug_msg += "after12hours:" + String(free_heap::after_12_hours) + " bytes.\n";}
+    if(free_heap::after_24_hours != 0) {global_buf_debug_msg += "after1day:"    + String(free_heap::after_24_hours) + " bytes.\n";}
+    if(free_heap::after_2_days != 0)   {global_buf_debug_msg += "after2days:"   + String(free_heap::after_2_days)   + " bytes.\n";}
+    if(free_heap::after_3_days != 0)   {global_buf_debug_msg += "after3days:"   + String(free_heap::after_3_days)   + " bytes.\n";}
+    if(free_heap::after_4_days != 0)   {global_buf_debug_msg += "after4days:"   + String(free_heap::after_4_days)   + " bytes.\n\n";}
+    global_buf_debug_msg += "lowest:"       + String(free_heap::lowest)         + " bytes.\n";
+    global_buf_debug_msg += "current: "     + String(ESP.getFreeHeap())         + " bytes.";
   }
 
   void send_debug_repor_by_command()

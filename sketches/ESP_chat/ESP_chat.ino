@@ -1946,7 +1946,7 @@
 
   void loop()                                      // основной луп //
   {
-    obj_stopwatch_ms_loop.start();                                                    // для подсчета времени лупа //
+    obj_stopwatch_ms_Main_LOOP.start();                                                    // для подсчета времени лупа //
 
     heap_control();
 
@@ -1978,5 +1978,5 @@
       flag_every_minute_timer = false;
     }
 
-    obj_stopwatch_ms_loop.stop();
+    obj_stopwatch_ms_Main_LOOP.stop();
   }
