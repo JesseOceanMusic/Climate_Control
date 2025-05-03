@@ -1946,9 +1946,9 @@
 
   void loop()                                      // основной луп //
   {
-    obj_stopwatch_ms_Main_LOOP.start();                                                    // для подсчета времени лупа //
+    obj_stopwatch_ms_Main_LOOP.start();                                               // для подсчета времени лупа //
 
-    heap_control();
+    free_heap::tick();
 
     object_TimeDate.update_TimeDate();                                                // обновляем текущее время //
 

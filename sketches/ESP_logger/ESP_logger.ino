@@ -42,10 +42,10 @@ String SYNCdata;                                 // стринг для полу
   int sat_HSV_line_day    = 70;                    // saturation (насыщенность) линии днём //
   int sat_HSV_clock_day   = 130;                   // saturation (насыщенность) часов днём //
 
-  int val_HSV_bra_night   = 0;                     // value (яркость) бра ночью //
-  int val_HSV_line_night  = 0;                     // value (яркость) линии ночью //
-  int val_HSV_clock_night = 1;                     // value (яркость) часов ночью //
-  byte RGB_clock_night [3] = {1, 1, 0,};           // цвет часов ночью. по умолчанию жёлтый (yellow) 1,1,0,
+  int val_HSV_bra_night    = 0;                     // value (яркость) бра ночью //
+  int val_HSV_line_night   = 0;                     // value (яркость) линии ночью //
+  int val_HSV_clock_night  = 1;                     // value (яркость) часов ночью //
+  byte RGB_clock_night [3] = {0, 0, 1,};           // цвет часов ночью. по умолчанию синий (blue) 0,0,1,
 
   int val_HSV_bra_cur     = val_HSV_bra_night;     // текущее значение яркости бра // нужно для плавного изменения яркости при изменение ночного режима по расписанию //
   int val_HSV_line_cur    = val_HSV_line_night;    // текущее значение яркости линии // ↑↑↑ //
@@ -1628,7 +1628,7 @@ String SYNCdata;                                 // стринг для полу
   {
     obj_stopwatch_ms_Main_LOOP.start();                                 // для подсчета времени лупа //
 
-    heap_control();
+    free_heap::tick();
 
     object_TimeDate.update_TimeDate();                                           // получаем актуальное время с сервера //
   

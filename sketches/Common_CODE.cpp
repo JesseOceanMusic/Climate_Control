@@ -176,17 +176,18 @@
 
       void start()
       {
-        _START_millis_stamp_ms = millis();
+        _START_micros_stamp_µs = micros();
       }      
 
       void stop()
       {
-        if(_START_millis_stamp_ms <= millis())
+        if(_START_micros_stamp_µs <= micros())
         {
           _iteration_counter++;
-          _stopwatch_total_sum_µs += (millis() - _START_millis_stamp_ms) * 1000;
+          _stopwatch_total_sum_µs += micros() - _START_micros_stamp_µs;
 
-          f_calculate_max();
+          f_calculate_low_µs();
+          f_calculate_max_ms();
           f_high_limit_counter();
         }
       }
@@ -203,22 +204,24 @@
 
         if (_iteration_counter != 0)
         {
-          buf_info += "max: " + String(_max) + " ms.\n";
-          f_calculate_avg();
-          buf_info += "avg: " + String(_avg) + " ms.\n";
+          float _low_ms = (float)_low_µs / 1000.0f;
+          buf_info += "low: " + String(_low_ms, 3) + " ms.\n";
+
+          buf_info += "max: " + String(_max_ms) + " ms.\n";
+          
+          f_calculate_avg_µs();
+          float _avg_ms = (float)_avg_µs / 1000.0f;
+          buf_info += "avg: " + String(_avg_ms, 3) + " ms.\n";
 
           buf_info += "\nThreshholds:\n";
           buf_info += "total: " + String(_iteration_counter) + "\n";
 
-          for (int i = 0; i < _high_limit_array_ms_length; i++)
+          for (int i = 0; i < _high_limit_array_length; i++)
           {
-            if(_high_limit_counter_array[i] != 0)
+            if(_high_limit_counter[i] != 0)
             {
-              buf_info += "above " + String(_high_limit_array_ms[i]) + "ms" + ": ";
-              buf_info += String(_high_limit_counter_array[i]);
-
-              float percentage = (float)_high_limit_counter_array[i] / (float)_iteration_counter * 100.0f;
-              buf_info += " (" + String(percentage, 6) + "%)\n" ;
+              float percentage = (float)_high_limit_counter[i] / (float)_iteration_counter * 100.0f;
+              buf_info += "above " + String(_high_limit_threshholds_ms[i]) + "ms" + ": " + String(_high_limit_counter[i]) + " (" + String(percentage, 6) + "%)\n" ;
             }
           }
         }
@@ -235,40 +238,50 @@
     private:
       String _name;
 
-      unsigned int _max = 0;
-      float _avg;
+      unsigned long _low_µs = 999999;
+      unsigned long _max_ms = 0;
+      unsigned long _avg_µs;
 
-      uint64_t _iteration_counter = 0;                                                   // избежать деление на 0
-      unsigned long _START_millis_stamp_ms;
-      uint64_t _stopwatch_total_sum_µs;
+      uint64_t      _iteration_counter = 0;
+      unsigned long _START_micros_stamp_µs = 0;
+      uint64_t      _stopwatch_total_sum_µs = 0;
 
-      const static byte _high_limit_array_ms_length = 16;
-      const unsigned int _high_limit_array_ms [_high_limit_array_ms_length] = {5, 10, 50, 100, 200, 400, 700, 1000, 1500, 2000, 6000, 10000, 15000, 20000, 30000, 60000};
-      unsigned int _high_limit_counter_array [_high_limit_array_ms_length]  = {0, 0,  0,  0,   0,   0,   0,   0,    0,    0,    0,    0,     0,     0,     0,     0};      // обнуляет все значения, чтобы не было мусорных значений.
+      const static byte  _high_limit_array_length                              = 16;
+      const unsigned int _high_limit_threshholds_ms [_high_limit_array_length] = {5, 10, 50, 100, 200, 400, 700, 1000, 1500, 2000, 6000, 10000, 15000, 20000, 30000, 60000};
+      unsigned int       _high_limit_counter        [_high_limit_array_length] = {0, 0,  0,  0,   0,   0,   0,   0,    0,    0,    0,    0,     0,     0,     0,     0};      // обнуляет все значения, чтобы не было мусорных значений.
 
-      void f_calculate_max()
+      void f_calculate_low_µs()
       {
-        if(_max < millis() - _START_millis_stamp_ms)
+        if(_low_µs > micros() - _START_micros_stamp_µs)
         {
-          _max = millis() - _START_millis_stamp_ms;
+          _low_µs = micros() - _START_micros_stamp_µs;
+        }  
+      }
+
+      void f_calculate_max_ms()
+      {
+        unsigned long elapsed_time = (micros() - _START_micros_stamp_µs) / 1000UL;
+
+        if(_max_ms < elapsed_time)
+        {
+          _max_ms = elapsed_time;
         }        
       }
 
-      void f_calculate_avg()
+      void f_calculate_avg_µs()
       {
-        unsigned int _avg_µs = _stopwatch_total_sum_µs / _iteration_counter;
-        _avg = (float)_avg_µs / 1000.0f;
+        _avg_µs = _stopwatch_total_sum_µs / _iteration_counter;
       }
 
       void f_high_limit_counter()
       {
-        unsigned int elapsed_time = millis() - _START_millis_stamp_ms;
+        unsigned long elapsed_time = (micros() - _START_micros_stamp_µs) / 1000UL;
 
-        for (int i = 0; i < _high_limit_array_ms_length; i++)
+        for (int i = 0; i < _high_limit_array_length; i++)
         {
-          if(elapsed_time > _high_limit_array_ms[i])
+          if(elapsed_time > _high_limit_threshholds_ms[i])
           {
-            _high_limit_counter_array[i]++;
+            _high_limit_counter[i]++;
           }
         }
       }
@@ -765,97 +778,29 @@
 
   namespace free_heap
   {
-    enum
-    {
-      AFTER_30_MIN,
-      AFTER_60_MIN,
-      AFTER_6_HOURS,
-      AFTER_12_HOURS,
-      AFTER_24_HOURS,
-      AFTER_2_DAYS,
-      AFTER_3_DAYS,
-      AFTER_4_DAYS,
-      END,
-    }state = free_heap::AFTER_30_MIN;
-
-    unsigned int after_30_min = 0;
-    unsigned int after_60_min = 0;
-    unsigned int after_6_hours = 0;
-    unsigned int after_12_hours = 0;
-    unsigned int after_24_hours = 0;
-    unsigned int after_2_days = 0;
-    unsigned int after_3_days = 0;
-    unsigned int after_4_days = 0;  
+    const byte array_length = 10;
+    const char name [array_length][9]            = {"30 min",   "60 min",   "4 hours",    "12 hours",    "24 hours",    "2 days",        "3 days",        "5 days",        "10 days",        "40 days"};
+    unsigned int thresholds_in_ms[array_length] = { 1000*60*30, 1000*60*60, 1000*60*60*4, 1000*60*60*12, 1000*60*60*24, 1000*60*60*24*2, 1000*60*60*24*3, 1000*60*60*24*5, 1000*60*60*24*10, 1000*60*60*24*40};
+    unsigned int data [array_length]             = { 0,          0,          0,            0,             0,             0,               0,               0,               0,                0,};
     unsigned int lowest = 999999;
-  }
 
-  void heap_control()
-  {
-    if(free_heap::lowest > ESP.getFreeHeap())
+    void tick()
     {
-      free_heap::lowest = ESP.getFreeHeap();
-    }
+      static byte state = 0;
 
-    switch(free_heap::state)
-    {
-      case free_heap::AFTER_30_MIN:
-        if(millis() > 1000 * 60 * 30)
+      if(lowest > ESP.getFreeHeap())
+      {
+        lowest = ESP.getFreeHeap();
+      }
+  
+      if(state <= array_length)
+      {
+        if(millis() > thresholds_in_ms[state])
         {
-          free_heap::after_30_min = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_60_MIN;
-          break;
+          data[state] = ESP.getFreeHeap();
+          state++;
         }
-      case free_heap::AFTER_60_MIN:
-        if(millis() > 1000 * 60 * 60)
-        {
-          free_heap::after_60_min = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_6_HOURS;
-          break;
-        }
-      case free_heap::AFTER_6_HOURS:
-        if(millis() > 1000 * 60 * 60 * 6)
-        {
-          free_heap::after_6_hours = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_12_HOURS;
-          break;
-        }
-      case free_heap::AFTER_12_HOURS:
-        if(millis() > 1000 * 60 * 60 * 12)
-        {
-          free_heap::after_12_hours = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_24_HOURS;
-          break;
-        }
-      case free_heap::AFTER_24_HOURS:
-        if(millis() > 1000 * 60 * 60 * 24)
-        {
-          free_heap::after_24_hours = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_2_DAYS;
-          break;
-        }
-      case free_heap::AFTER_2_DAYS:
-        if(millis() > 1000 * 60 * 60 * 24 * 2)
-        {
-          free_heap::after_2_days = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_3_DAYS;
-          break;
-        }
-      case free_heap::AFTER_3_DAYS:
-        if(millis() > 1000 * 60 * 60 * 24 * 3)
-        {
-          free_heap::after_3_days = ESP.getFreeHeap();
-          free_heap::state = free_heap::AFTER_4_DAYS;
-          break;
-        }
-      case free_heap::AFTER_4_DAYS:
-        if(millis() > 1000 * 60 * 60 * 24 * 4)
-        {
-          free_heap::after_4_days = ESP.getFreeHeap();
-          free_heap::state = free_heap::END;
-          break;
-        }
-      case free_heap::END:
-          break;
+      }
     }
   }
 
@@ -863,21 +808,23 @@
   {
     global_buf_debug_msg  = obj_stopwatch_ms_Main_LOOP.get_string_info();
     global_buf_debug_msg += obj_stopwatch_ms_Telegram_TICK.get_string_info();
+
     #ifdef THIS_IS_LOGGER_CODE
       global_buf_debug_msg += obj_stopwatch_ms_Send_Log.get_string_info();
     #endif
 
-    global_buf_debug_msg += "FREE HEAP:\n";
-    if(free_heap::after_30_min != 0)   {global_buf_debug_msg += "after30min:"   + String(free_heap::after_30_min)   + " bytes.\n";}
-    if(free_heap::after_60_min != 0)   {global_buf_debug_msg += "after60min:"   + String(free_heap::after_60_min)   + " bytes.\n";}
-    if(free_heap::after_6_hours != 0)  {global_buf_debug_msg += "after6hours:"  + String(free_heap::after_6_hours)  + " bytes.\n";}
-    if(free_heap::after_12_hours != 0) {global_buf_debug_msg += "after12hours:" + String(free_heap::after_12_hours) + " bytes.\n";}
-    if(free_heap::after_24_hours != 0) {global_buf_debug_msg += "after1day:"    + String(free_heap::after_24_hours) + " bytes.\n";}
-    if(free_heap::after_2_days != 0)   {global_buf_debug_msg += "after2days:"   + String(free_heap::after_2_days)   + " bytes.\n";}
-    if(free_heap::after_3_days != 0)   {global_buf_debug_msg += "after3days:"   + String(free_heap::after_3_days)   + " bytes.\n";}
-    if(free_heap::after_4_days != 0)   {global_buf_debug_msg += "after4days:"   + String(free_heap::after_4_days)   + " bytes.\n\n";}
-    global_buf_debug_msg += "lowest:"       + String(free_heap::lowest)         + " bytes.\n";
-    global_buf_debug_msg += "current: "     + String(ESP.getFreeHeap())         + " bytes.";
+    global_buf_debug_msg += "\n!!! FREE HEAP !!!:\n";
+
+    for(int i = 0; i < free_heap::array_length; i++)
+    {
+      if(free_heap::data[i] != 0)
+      {
+        global_buf_debug_msg += "after" + String(free_heap::name[i]) + ": " + String(free_heap::data[i]) + " bytes.\n";
+      }
+    }
+
+    global_buf_debug_msg += "\nlowest: "       + String(free_heap::lowest)         + " bytes.";
+    global_buf_debug_msg += "\ncurrent:  "     + String(ESP.getFreeHeap())         + " bytes.";
   }
 
   void send_debug_repor_by_command()
