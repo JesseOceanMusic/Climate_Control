@@ -4,10 +4,9 @@
 
 #define THIS_IS_CHAT_CODE
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
-//#define FB_USE_LOG Serial
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_014\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_015\Common_CODE.cpp"
 
 /// ↓↓↓ Синхронизация ошибок
 
@@ -693,10 +692,6 @@
   float room_humidity_range  =  2.00;              // чувствительность +- включения выключения увлажнителя //
   float room_humidity_target = 40.00;              // желаемая влажность //
 
-  float room_conditioner_temp_range  = 0.3;        // чувствительность +- включения выключения "охладителя" //
-  float room_conditioner_temp_target = 23.7;       // желаемая температура летом //
-  bool  room_conditioner_flag = true;
-
   class class_SHT41                                // класс датчика SHT41 температуры и влажности //
   {
     public:
@@ -836,34 +831,18 @@
       }
     }
   }
-/// ↓↓↓ Увлажнитель и "охладитель"
+/// ↓↓↓ Увлажнитель
 
   void humidifier()                                // увлажнитель //
   {
-    if(room_conditioner_flag == false)
+    if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
     {
-      if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
-      {
-        analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
-      }
-
-      else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
-      {
-        analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
-      }
+      analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
     }
 
-    else
+    else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
     {
-      if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range) || object_Temp_Humidity_sensor.get_temp() > (room_conditioner_temp_target + room_conditioner_temp_range))
-      {
-        analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
-      }
-
-      else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range) && object_Temp_Humidity_sensor.get_temp() < (room_conditioner_temp_target - room_conditioner_temp_range))
-      {
-        analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
-      }      
+      analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
     }
   }
 
@@ -1504,22 +1483,6 @@
         break;  
       }
 
-      case 116:                                   // установка температуры охладителя //
-      {
-        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        room_conditioner_temp_target = constrain(buf_text_float, 22, 30);
-        object_array_users[users_array_index].send_message("Охладитель установлен на температуру: " + String(room_conditioner_temp_target) + "°C");
-        break; 
-      }
-
-      case 117:                                   // установка чувствительности охладителя //
-      {
-        float buf_text_float = text.toFloat();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
-        room_conditioner_temp_target = constrain(buf_text_float, 0.2, 6);
-        object_array_users[users_array_index].send_message("Охладитель включится/выключится при отклонение +- " + String(room_conditioner_temp_target) + "°C");
-        break;   
-      }
-
       case 390:                                  // выбор гостевого чата вручную //
       {
         if (object_array_users[users_array_index].get_admin_flag() == true)
@@ -1697,36 +1660,6 @@
         String buf =  "Отправьте сообщение для установки чувствительности увлажнителя (от 1 до 20).\n\nТекущее значение: " + String(room_humidity_range);
         object_array_users[users_array_index].send_message(buf);
         object_array_users[users_array_index].set_message_state(114);
-        break;
-      }
-
-      case 115:                                   // вкл/откл охладителя //
-      {
-        room_conditioner_flag = !room_conditioner_flag;
-        if (room_conditioner_flag == true)
-        {
-          object_array_users[users_array_index].send_message("Охладитель включен.");
-        }
-        else
-        {
-          object_array_users[users_array_index].send_message("Охладитель отключен.");
-        }
-        break;
-      }
-
-      case 116:                                   // установка температуры охладителя //
-      {
-        String buf =  "Отправьте сообщение для установки температуры охладителя в °C (от 22 до 30):\n\nТекущее значение: " + String(room_conditioner_temp_target) +\
-                      "\n\n*Охладитель управляет увлажнителем. (во время испарения воды (адиабатическое охлаждение/увлажнение) происходит незначительное охлаждение, может помочь немного снизить температуру летом)";
-        object_array_users[users_array_index].send_message(buf);
-        object_array_users[users_array_index].set_message_state(116);
-        break;
-      }
-
-      case 117:                                   // установка чувствительности охладителя //
-      {
-        object_array_users[users_array_index].send_message("Отправьте сообщение дла установки чувствительности охладителя в °C (от 0.2 до 6):\n\nТекущее значение: " + String(room_conditioner_temp_range));
-        object_array_users[users_array_index].set_message_state(117);
         break;
       }
 

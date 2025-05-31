@@ -4,9 +4,9 @@
 
 #define THIS_IS_LOGGER_CODE
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
-//#define FB_USE_LOG Serial
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_014\Common_CODE.cpp"
+
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_015\Common_CODE.cpp"
 
 String SYNCdata;                                 // стринг для полученных данных из Serial Port //
 
