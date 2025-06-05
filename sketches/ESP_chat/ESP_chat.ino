@@ -1405,7 +1405,7 @@
 
       case 108:                                  // установка шага заслонок //
       {
-        int calculation_buf2 = 999999;
+        int calculation_buf2 = 0;
         int buf_text_int = text.toInt();                   // "Because of the way the constrain() function is implemented, avoid using other functions inside the brackets, it may lead to incorrect results."  https://www.arduino.cc/reference/en/language/functions/math/constrain/
         Step_Per_loop = constrain(buf_text_int, 0, 1000);  // Ограничивает диапазон возможных значений //
         if(Step_Per_loop != 0)
@@ -1582,7 +1582,7 @@
 
       case 108:                                  // установка шага заслонок //
       {
-        int calculation_buf2 = 999999;
+        int calculation_buf2 = 0;
 
         if(Step_Per_loop != 0)
         {

@@ -7,6 +7,10 @@
     #endif
   }
 
+/// ↓↓↓ VARIABLES limits
+
+  #define U_LONG_MAX_VALUE 4294967295
+
 /// ↓↓↓ Время
 
   class class_TimeDate                                     // класс Даты и Времени //
@@ -238,7 +242,7 @@
     private:
       String _name;
 
-      unsigned long _low_µs = 999999;
+      unsigned long _low_µs = U_LONG_MAX_VALUE;
       unsigned long _max_ms = 0;
       unsigned long _avg_µs;
 
@@ -782,7 +786,7 @@
     const char name [array_length][9]            = {"30 min",   "60 min",   "4 hours",    "12 hours",    "24 hours",    "2 days",        "3 days",        "5 days",        "10 days",        "40 days"};
     unsigned int thresholds_in_ms[array_length] = { 1000*60*30, 1000*60*60, 1000*60*60*4, 1000*60*60*12, 1000*60*60*24, 1000*60*60*24*2, 1000*60*60*24*3, 1000*60*60*24*5, 1000*60*60*24*10, 1000*60*60*24*40};
     unsigned int data [array_length]             = { 0,          0,          0,            0,             0,             0,               0,               0,               0,                0,};
-    unsigned int lowest = 999999;
+    unsigned int lowest = U_LONG_MAX_VALUE;
 
     void tick()
     {
