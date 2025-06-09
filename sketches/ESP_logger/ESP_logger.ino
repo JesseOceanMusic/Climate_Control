@@ -6,7 +6,7 @@
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_015\Common_CODE.cpp"
+#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_016\Common_CODE.cpp"
 
 String SYNCdata;                                 // стринг для полученных данных из Serial Port //
 
@@ -581,125 +581,354 @@ String SYNCdata;                                 // стринг для полу
   // UPDATE v037 - одномерные массивы стали двумерными и код стал короче ~280 строк. Теперь разобраться в коде еще сложнее.
   // UPDATE v041 - появился class_Clock, что позволило внутри него создавать временные массивы и не хранить глобальные для обращения из разных функций. Думаю, экономия составила байт 150 :-)
 
-  // общий смысл массивов такой:
-  // 1 - преобразуем цифру в формат семисегментного отображения
-  // 2 - преобразуем полученный результат с учетом смещения для конкретной цифры на табло (из-за того, что свтодиодная лента расположена змейкой и не одномерна)
-  // 3 - складываем отдельные цифры и знаки "%" "." ":"" в один большой массив из 0 и 1
-  // 4 - отображаем данные где для каждого светодиода Value в HSV умножаем на 0 или 1 для того, чтобы получились цифры на табло.
+  /*ОБЩАЯ ЛОГИКА МАССИВОВ
+    1 - преобразуем цифру в формат семисегментного отображения
+    2 - преобразуем полученный результат с учетом смещения для конкретной цифры на табло (из-за того, что свтодиодная лента расположена змейкой и не одномерна)
+    3 - складываем отдельные цифры и знаки "%" "." ":"" в один большой массив из 0 и 1
+    4 - отображаем данные где для каждого светодиода Value в HSV умножаем на 0 или 1 для того, чтобы получились цифры на табло.
+  */
 
-  // последовательность сегментов используемая в digit_to_segment_converter. //
-  // первый сегмент - нижний-центральный. //
-  // второй сегмент - средний-центральный. //
-  // трейтий сегмент - верхний-центральный. //
-  // четвертый сегмент - нижний-левый. //
-  // пятый сегмент - верхний-левый. //
-  // шестой сегмент - нижний-правый. //
-  // седьмой сегмент - верхный-правый. //
+  /*БАЗОВАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ сегментов используемая в digit_to_segment_converter.
+    [0] сегмент - нижний-центральный.
+    [1] сегмент - средний-центральный.
+    [2] сегмент - верхний-центральный.
+    [3] сегмент - нижний-левый.
+    [4] сегмент - верхний-левый.
+    [5] сегмент - нижний-правый.
+    [6] сегмент - верхный-правый.
+  
+    ┌───[2]───┐
+    │         │
+    [4]     [6]
+    │         │
+    ├───[1]───┤
+    │         │
+    [3]     [5]
+    │         │
+    └───[0]───┘
+  */
 
   byte ClockArray_main [Clock_Leds_Amount];        // основной массив для отображения данных (результат сложения 13 цифр + точка, двоеточие, процент) //
-  byte ArrayGlobalCounter = 0;                     // счетчик для сложения массивов //
   bool clock_halfLED_turn_off = true;              // выключиет половину светодиодов в цифрах, чтобы снизить яркость //
+
+  #define CLOCK_EMPTY_NUMBER 10                    // выключает все сегменты.
+  #define CLOCK_FILL_NUMBER  8                     // цифра 8 и есть FILL.
 
   class class_Clock                                // класс часов //
   {
     public:
-      class_Clock(byte key, byte array_length)               // конструктор класса //
+      class_Clock(byte key, unsigned int array_first_index, byte array_length, bool is_it_symbol)               // конструктор класса //
       {
         _key_ID = key;                                       // ключ смещения цифр относительно описанного определения выше на 15 строк //
+        _array_first_index = array_first_index;
         _array_length = array_length;                        // длина массива. для точки будет 1, для цифры 14 итд. необходимо, чтобы потом складывать массивы //
+        _is_it_symbol = is_it_symbol;
       }
       
-      void set_cur_number(byte cur_number)                   // может получить 1 из 12 цифр. 10 значений это цифры от 0 до 9 // плюс 2 значения - одно пустая заливка, другое полная заливка. используется для символов и когда не нужно отображать какую-то цифру. либо ночной режим, либо чтобы вместо 09:55 отображать 9:55 //
+      void set_cur_number(byte cur_number)                   // от 0 до 9 = цифры от 0 до 9  //  10 = EMPTY  //
       {
-        _cur_number = constrain(cur_number, 0, 11);          // защита от дурака. проверяет, чтобы точно не выйти за границу массива, когда будем использовать эту перменную в методе update //
+        _cur_number = constrain(cur_number, 0, 10);          // защита от дурака. проверяет, чтобы точно не выйти за границу массива, когда будем использовать эту перменную в методе update //
       }
 
-      void update()                                          // вызов update отдельных объектов должен быть обязательно последовательным, поскольку внутри есть сразу сложение в основной массив. если вызывать update у объектов в другой последовательности - отобразиться чушь. //
+      void update()
       { 
         byte buf_array [14];
 
-        for (int i = 0; i < 7; i++)                          // по сути, этот цикл является очень примитивным дешифратором, где _key_ID это индекс строки в массиве _key_ARRAY, на которой лежит ключ//
+        for (int i = 0; i < 7; i++)                          // примитивный дешифратор, где _key_ID это индекс строки в массиве _key_ARRAY, на которой лежит ключ//
         {    
-          jesse_yield_func();
+          buf_array [i*2]     = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];                 // ДЕШИФРАТОР - не пытайся разобраться! //
+          buf_array [(i*2)+1] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];                 // ДЕШИФРАТОР - не пытайся разобраться! //
+        }
 
-          buf_array [i*2] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
-          buf_array [(i*2)+1] = _numbers_code_array [_cur_number][_key_ARRAY [_key_ID][i]];
-
-          if (clock_halfLED_turn_off == true && _array_length == 14)                                         // если включён режим половины светодиодов и это цифра, а не двоеточие/процент/точка //
+        if (clock_halfLED_turn_off == true)                  // если включён режим половины светодиодов //
+        {
+          if (_is_it_symbol == false)                        // если это НЕ символ (двоеточие/процент/точка) //
           {
-            if (object_NightTime.get_NightTimeState() == 2 || object_NightTime.get_NightTimeState() == 4)    // если влючен ночной режим//
+            if (object_NightTime.get_NightTimeState() == 2 || object_NightTime.get_NightTimeState() == 4)   // если влючен ночной режим //
             {
-              buf_array [(i*2)+1] = 0;
+              for (int i = 0; i < 7; i++)
+              {
+                buf_array [i*2] = 0;
+              }
             }
           }
         }
 
-        for (int i = 0; i < _array_length; i++)              // полученный результат переносим в основной массив ClockArray_main, чтобы при вызове следующих объектов сохранить индекс - храним его в ArrayGlobalCounter //
+        for (int i = 0; i < _array_length; i++)              // полученный результат переносим в основной массив ClockArray_main //
         {
           jesse_yield_func();
-          ClockArray_main [ArrayGlobalCounter++] = buf_array [i];
+
+          if (_array_first_index + i < Clock_Leds_Amount)    // проверка, на всякий случай, чтобы не выйти за границы массива Clock_Leds_Amount=191, последний индекс массива = 190 //
+          {
+            ClockArray_main [_array_first_index + i] = buf_array [i];
+          }
         }
       }
 
     private:
       byte _key_ID;
+      unsigned int _array_first_index;
       byte _array_length;
+      bool _is_it_symbol;
+
       byte _cur_number;
 
-      const byte _numbers_code_array [12][7] =               // цифры в семисегментном формате //
+      static constexpr byte _numbers_code_array [11][7] =        // цифры в семисегментном формате //
       {
-        {1, 0, 1, 1, 1, 1, 1,},                              // 0
-        {0, 0, 0, 0, 0, 1, 1,},                              // 1
-        {1, 1, 1, 1, 0, 0, 1,},                              // 2
-        {1, 1, 1, 0, 0, 1, 1,},                              // 3
-        {0, 1, 0, 0, 1, 1, 1,},                              // 4
-        {1, 1, 1, 0, 1, 1, 0,},                              // 5
-        {1, 1, 1, 1, 1, 1, 0,},                              // 6
-        {0, 0, 1, 0, 0, 1, 1,},                              // 7
-        {1, 1, 1, 1, 1, 1, 1,},                              // 8
-        {1, 1, 1, 0, 1, 1, 1,},                              // 9
-        {0, 0, 0, 0, 0, 0, 0,},                              // empty
-        {1, 1, 1, 1, 1, 1 ,1,},                              // fill
+        {    1, 0, 1, 1, 1, 1, 1,},                          // 0
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          [4]     [6]
+          │         │
+          ├─────────┤
+          │         │
+          [3]     [5]
+          │         │
+          └───[0]───┘
+          */
+        {    0, 0, 0, 0, 0, 1, 1,},                          // 1
+          /* 0  1  2  3  4  5  6
+          ┌─────────┐
+          │         │
+          │       [6]
+          │         │
+          ├─────────┤
+          │         │
+          │       [5]
+          │         │
+          └─────────┘
+          */
+        {    1, 1, 1, 1, 0, 0, 1,},                          // 2
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          │       [6]
+          │         │
+          ├───[1]───┤
+          │         │
+          [3]       │
+          │         │
+          └───[0]───┘
+          */
+        {    1, 1, 1, 0, 0, 1, 1,},                          // 3
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          │       [6]
+          │         │
+          ├───[1]───┤
+          │         │
+          │       [5]
+          │         │
+          └───[0]───┘
+          */
+        {    0, 1, 0, 0, 1, 1, 1,},                          // 4
+          /* 0  1  2  3  4  5  6
+          ┌─────────┐
+          │         │
+          [4]     [6]
+          │         │
+          ├───[1]───┤
+          │         │
+          │       [5]
+          │         │
+          └─────────┘
+          */
+        {    1, 1, 1, 0, 1, 1, 0,},                          // 5
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          [4]       │
+          │         │
+          ├───[1]───┤
+          │         │
+          │       [5]
+          │         │
+          └───[0]───┘
+          */
+        {    1, 1, 1, 1, 1, 1, 0,},                          // 6
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          [4]       │
+          │         │
+          ├───[1]───┤
+          │         │
+          [3]     [5]
+          │         │
+          └───[0]───┘
+          */
+        {    0, 0, 1, 0, 0, 1, 1,},                          // 7
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          │       [6]
+          │         │
+          ├─────────┤
+          │         │
+          │       [5]
+          │         │
+          └─────────┘
+          */
+        {    1, 1, 1, 1, 1, 1, 1,},                          // 8
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          [4]     [6]
+          │         │
+          ├───[1]───┤
+          │         │
+          [3]     [5]
+          │         │
+          └───[0]───┘
+          */
+        {    1, 1, 1, 0, 1, 1, 1,},                          // 9
+          /* 0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          [4]     [6]
+          │         │
+          ├───[1]───┤
+          │         │
+          │       [5]
+          │         │
+          └───[0]───┘
+          */
+        {    0, 0, 0, 0, 0, 0, 0,},                          // empty
+          /* 0  1  2  3  4  5  6
+          ┌─────────┐
+          │         │
+          │         │
+          │         │
+          ├─────────┤
+          │         │
+          │         │
+          │         │
+          └─────────┘
+          */
       };
 
-      const byte _key_ARRAY [6][7] =                         // ключи смещения цифр //
+      static constexpr byte _key_ARRAY [6][7] =                  // ключи смещения цифр //
       {
-        {5, 0, 3, 1, 6, 2, 4,},                              // смещение сегментов (цифры 1, 2)
-        {1, 5, 0, 3, 4, 2, 6,},                              // смещение сегментов (цифра 3)
-        {4, 2, 6, 5, 0, 3, 1,},                              // смещение сегментов (цифры 4, 5)
-        {5, 0, 3, 4, 2, 6, 1,},                              // смещение сегментов (цифры 6, 7, 8, 9)
-        {4, 2, 6, 5, 0, 3, 1,},                              // смещение сегментов (цифры 10, 11, 12, 13)
-        {0, 1, 2, 3, 4, 5, 6,},                              // прямая последовательность для точки, двоеточия, процента
+        {    0, 1, 2, 3, 4, 5, 6,},                              // прямая последовательность для точки, двоеточия, процента
+          /* ↑  ↑  ↑  ↑  ↑  ↑  ↑
+          .  0  1  2  3  4  5  6
+          ┌───[2]───┐
+          │         │
+          [4]     [6]
+          │         │
+          ├───[1]───┤
+          │         │
+          [3]     [5]
+          │         │
+          └───[0]───┘
+          */
+        {    5, 0, 3, 1, 6, 2, 4,},                              // смещение сегментов (цифры 1, 2)
+          /* ↑  ↑  ↑  ↑  ↑  ↑  ↑
+          .  0  1  2  3  4  5  6
+          ┌───[2→5]───┐
+          │           │
+          [4→6]   [6→4]
+          │           │
+          ├───[1→3]───┤
+          │           │
+          [3→2]   [5→0]
+          │           │
+          └───[0→1]───┘
+          */
+        {    1, 5, 0, 3, 4, 2, 6,},                              // смещение сегментов (цифра 3)
+          /* ↑  ↑  ↑  ↑  ↑  ↑  ↑
+          .  0  1  2  3  4  5  6
+          ┌───[2→5]───┐
+          │           │
+          [4→4]   [6→6]
+          │           │
+          ├───[1→0]───┤
+          │           │
+          [3→3]   [5→1]
+          │           │
+          └───[0→2]───┘
+          */
+        {    4, 2, 6, 5, 0, 3, 1,},                              // смещение сегментов (цифры 4, 5)
+          /* ↑  ↑  ↑  ↑  ↑  ↑  ↑
+          .  0  1  2  3  4  5  6
+          ┌───[2→1]───┐
+          │           │
+          [4→0]   [6→2]
+          │           │
+          ├───[1→6]───┤
+          │           │
+          [3→5]   [5→3]
+          │           │
+          └───[0→4]───┘
+          */
+        {    5, 0, 3, 4, 2, 6, 1,},                              // смещение сегментов (цифры 6, 7, 8, 9)
+          /* ↑  ↑  ↑  ↑  ↑  ↑  ↑
+          .  0  1  2  3  4  5  6
+          ┌───[2→4]───┐
+          │           │
+          [4→3]   [6→5]
+          │           │
+          ├───[1→6]───┤
+          │           │
+          [3→2]   [5→0]
+          │           │
+          └───[0→1]───┘
+          */
+        {    4, 2, 6, 5, 0, 3, 1,},                              // смещение сегментов (цифры 10, 11, 12, 13)
+          /* ↑  ↑  ↑  ↑  ↑  ↑  ↑
+          .  0  1  2  3  4  5  6
+          ┌───[2→1]───┐
+          │           │
+          [4→0]   [6→2]
+          │           │
+          ├───[1→6]───┤
+          │           │
+          [3→5]   [5→3]
+          │           │
+          └───[0→4]───┘
+          */
       };
   };
 
-  class_Clock object_clock_PERCENTAGE (5, 6);      // символ процента //
-  class_Clock object_clock_0 (0, 14);              // Влажность // 
-  class_Clock object_clock_1 (0, 14);              // Влажность //
-  class_Clock object_clock_2 (1, 14);              // Температура //
-  class_Clock object_clock_3 (2, 14);              // Температура //
-  class_Clock object_clock_DOT (5, 1);             // символ точки //
-  class_Clock object_clock_4 (2, 14);              // температура //
-  class_Clock object_clock_5 (3, 14);              // СО2 //
-  class_Clock object_clock_6 (3, 14);              // СО2 //
-  class_Clock object_clock_7 (3, 14);              // СО2 //
-  class_Clock object_clock_8 (3, 14);              // СО2 //
-  class_Clock object_clock_9 (4, 14);              // время //
-  class_Clock object_clock_10 (4, 14);             // время //
-  class_Clock object_clock_COLON (5, 2);           // символ двоеточия //
-  class_Clock object_clock_11 (4, 14);             // время //
-  class_Clock object_clock_12 (4, 14);             // время //
+  /* РИСУНОК ЧАСОВ (расположение лед ленты)
 
-  bool clock_night_indication_time = true;         // флаг отображаем/не отображаем ночью на табло // ВРЕМЯ // 
-  bool clock_night_indication_co2 = false;         // ↑↑↑ // СО2 //
-  bool clock_night_indication_temperature = false; // ↑↑↑ // температура //
-  bool clock_night_indication_humidity = false;    // ↑↑↑ // влажность //
+    ┌→[9]→[10]→[COLON]→[11]→→→→→[12]→→→
+    ↑
+    └←[8]←←[7]←←←←←←←←←[6]←←←←←←←[5]←←┐
+    .                                 ↑
+    ┌→→→→→→[2]→→→→→→→→→[3]→[DOT]→[4]→→┘
+    ↑
+    └←[1]←←[0]←←←←←←←←←[PERCENTAGE]←←←←
+
+  */
+
+  class_Clock object_clock_PERCENTAGE (0, 0,  6,   true);      // символ процента  // index 0-5
+  class_Clock object_clock_0          (1, 6,  14,  false);     // Влажность        // index 6-19
+  class_Clock object_clock_1          (1, 20, 14,  false);     // Влажность        // index 20-33
+  class_Clock object_clock_2          (2, 34, 14,  false);     // Температура      // index 34-47
+  class_Clock object_clock_3          (3, 48, 14,  false);     // Температура      // index 48-61
+  class_Clock object_clock_DOT        (0, 62, 1,   true);      // символ точки     // index 62
+  class_Clock object_clock_4          (3, 63, 14,  false);     // температура      // index 63-76
+  class_Clock object_clock_5          (4, 77, 14,  false);     // СО2              // index 77-90
+  class_Clock object_clock_6          (4, 91, 14,  false);     // СО2              // index 91-104
+  class_Clock object_clock_7          (4, 105, 14, false);     // СО2              // index 105-118
+  class_Clock object_clock_8          (4, 119, 14, false);     // СО2              // index 119-132
+  class_Clock object_clock_9          (5, 133, 14, false);     // время            // index 133-146
+  class_Clock object_clock_10         (5, 147, 14, false);     // время            // index 147-162
+  class_Clock object_clock_COLON      (0, 161, 2,  true);      // символ двоеточия // index 161-162
+  class_Clock object_clock_11         (5, 163, 14, false);     // время            // index 163-176
+  class_Clock object_clock_12         (5, 177, 14, false);     // время            // index 177-190
+
+  bool clock_night_indication_time        = true;  // ВРЕМЯ       // флаг отображения ночью на табло 
+  bool clock_night_indication_co2         = false; // СО2         // ↑↑↑
+  bool clock_night_indication_temperature = false; // ТЕМПЕРАТУРА // ↑↑↑
+  bool clock_night_indication_humidity    = false; // ВЛАЖНОСТЬ   // ↑↑↑
 
   void clock_master()                              // мастер функция для часов вызывающая другие функции и методы. //
   {
     clock_string_to_array_converter();
-
-    ArrayGlobalCounter = 0;
 
     object_clock_PERCENTAGE.update();
     object_clock_0.update();
@@ -742,13 +971,13 @@ String SYNCdata;                                 // стринг для полу
 
     if (buf2_hum == 0)                                            // если влажность при синхронизации не пришла и равна 0, то выключает индикацию влажности //
     {
-      object_clock_PERCENTAGE.set_cur_number(10);                                      // выключает подсветку % //
-      object_clock_0.set_cur_number(10);
-      object_clock_1.set_cur_number(10);
+      object_clock_PERCENTAGE.set_cur_number(CLOCK_EMPTY_NUMBER); // выключает подсветку % //
+      object_clock_0.set_cur_number(CLOCK_EMPTY_NUMBER);
+      object_clock_1.set_cur_number(CLOCK_EMPTY_NUMBER);
     }
     else
     {
-      object_clock_PERCENTAGE.set_cur_number(11);                                      // включает подсветку % //
+      object_clock_PERCENTAGE.set_cur_number(CLOCK_FILL_NUMBER);                                      // включает подсветку % //
       object_clock_0.set_cur_number(buf2_hum % 10);
       buf2_hum /= 10;
       object_clock_1.set_cur_number(buf2_hum % 10);
@@ -756,14 +985,14 @@ String SYNCdata;                                 // стринг для полу
 
     if (buf2_temp == 0)                                           // если температура при синхронизации не пришла и равна 0, то выключает индикацию температуры //
     {
-      object_clock_DOT.set_cur_number(10);                                              // выключает подсчетку точки //
-      object_clock_4.set_cur_number(10);
-      object_clock_3.set_cur_number(10);
-      object_clock_2.set_cur_number(10);
+      object_clock_DOT.set_cur_number(CLOCK_EMPTY_NUMBER);                                              // выключает подсчетку точки //
+      object_clock_4.set_cur_number(CLOCK_EMPTY_NUMBER);
+      object_clock_3.set_cur_number(CLOCK_EMPTY_NUMBER);
+      object_clock_2.set_cur_number(CLOCK_EMPTY_NUMBER);
     }
     else
     {
-      object_clock_DOT.set_cur_number(11);                                              // включает подсветку точки //
+      object_clock_DOT.set_cur_number(CLOCK_FILL_NUMBER);                                              // включает подсветку точки //
       object_clock_4.set_cur_number(buf2_temp % 10);
       buf2_temp /= 10;
       object_clock_3.set_cur_number(buf2_temp % 10);
@@ -773,10 +1002,10 @@ String SYNCdata;                                 // стринг для полу
 
     if (buf2_co2 == 0)                                            // если со2 при синхронизации не пришла и равна 0, то выключает индакацию со2 //
     {
-      object_clock_5.set_cur_number(10);
-      object_clock_6.set_cur_number(10);
-      object_clock_7.set_cur_number(10);
-      object_clock_8.set_cur_number(10);
+      object_clock_5.set_cur_number(CLOCK_EMPTY_NUMBER);
+      object_clock_6.set_cur_number(CLOCK_EMPTY_NUMBER);
+      object_clock_7.set_cur_number(CLOCK_EMPTY_NUMBER);
+      object_clock_8.set_cur_number(CLOCK_EMPTY_NUMBER);
     }
 
     else
@@ -790,7 +1019,7 @@ String SYNCdata;                                 // стринг для полу
       
       if (buf2_co2 == 0)
       {
-        object_clock_8.set_cur_number(10);
+        object_clock_8.set_cur_number(CLOCK_EMPTY_NUMBER);
       }
       
       else
@@ -799,18 +1028,21 @@ String SYNCdata;                                 // стринг для полу
       }
     }
 
+    /*
     if (object_TimeDate.get_HOUR() < 10)                                            // если меньше 10 утра, то выключает первую цифру, чтобы получить 8:55 вместо 08:55 //
     {
-      object_clock_9.set_cur_number(10);
+      object_clock_9.set_cur_number(CLOCK_EMPTY_NUMBER);
     }
 
     else
     {
       object_clock_9.set_cur_number(object_TimeDate.get_HOUR()/10);
     }
+    */
 
+    object_clock_9.set_cur_number(object_TimeDate.get_HOUR()/10);
     object_clock_10.set_cur_number(object_TimeDate.get_HOUR()%10);
-    object_clock_COLON.set_cur_number(11);
+    object_clock_COLON.set_cur_number(CLOCK_FILL_NUMBER);
     object_clock_11.set_cur_number(object_TimeDate.get_MIN()/10);
     object_clock_12.set_cur_number(object_TimeDate.get_MIN()%10);
 
@@ -820,34 +1052,34 @@ String SYNCdata;                                 // стринг для полу
       {
         if (clock_night_indication_time == false)
         {
-          object_clock_COLON.set_cur_number(10);                                             // выключает подсветку двоеточия //
-          object_clock_9.set_cur_number(10);                  // выключает цифры //
-          object_clock_10.set_cur_number(10);                 // ↑↑↑ //
-          object_clock_11.set_cur_number(10);                 // ↑↑↑ //
-          object_clock_12.set_cur_number(10);                 // ↑↑↑ //
+          object_clock_COLON.set_cur_number(CLOCK_EMPTY_NUMBER);                                             // выключает подсветку двоеточия //
+          object_clock_9.set_cur_number(CLOCK_EMPTY_NUMBER);                  // выключает цифры //
+          object_clock_10.set_cur_number(CLOCK_EMPTY_NUMBER);                 // ↑↑↑ //
+          object_clock_11.set_cur_number(CLOCK_EMPTY_NUMBER);                 // ↑↑↑ //
+          object_clock_12.set_cur_number(CLOCK_EMPTY_NUMBER);                 // ↑↑↑ //
         }
 
         if (clock_night_indication_co2 == false)
         {
-          object_clock_5.set_cur_number(10);                  // выключает цифры //
-          object_clock_6.set_cur_number(10);                  // ↑↑↑ //
-          object_clock_7.set_cur_number(10);                  // ↑↑↑ //
-          object_clock_8.set_cur_number(10);                  // ↑↑↑ //
+          object_clock_5.set_cur_number(CLOCK_EMPTY_NUMBER);                  // выключает цифры //
+          object_clock_6.set_cur_number(CLOCK_EMPTY_NUMBER);                  // ↑↑↑ //
+          object_clock_7.set_cur_number(CLOCK_EMPTY_NUMBER);                  // ↑↑↑ //
+          object_clock_8.set_cur_number(CLOCK_EMPTY_NUMBER);                  // ↑↑↑ //
         }
 
         if (clock_night_indication_temperature == false)
         {
-          object_clock_DOT.set_cur_number(10);                                               // выключает подсчетку точки //
-          object_clock_4.set_cur_number(10);                  // выключает цифры //
-          object_clock_3.set_cur_number(10);                  // ↑↑↑ //
-          object_clock_2.set_cur_number(10);                  // ↑↑↑ //
+          object_clock_DOT.set_cur_number(CLOCK_EMPTY_NUMBER);                                               // выключает подсчетку точки //
+          object_clock_4.set_cur_number(CLOCK_EMPTY_NUMBER);                  // выключает цифры //
+          object_clock_3.set_cur_number(CLOCK_EMPTY_NUMBER);                  // ↑↑↑ //
+          object_clock_2.set_cur_number(CLOCK_EMPTY_NUMBER);                  // ↑↑↑ //
         }
 
         if (clock_night_indication_humidity == false)
         {
-          object_clock_PERCENTAGE.set_cur_number(10);                                         // выключает подсветку % //
-          object_clock_0.set_cur_number(10);                   // выключает цифры //
-          object_clock_1.set_cur_number(10);                   // ↑↑↑ //
+          object_clock_PERCENTAGE.set_cur_number(CLOCK_EMPTY_NUMBER);                                         // выключает подсветку % //
+          object_clock_0.set_cur_number(CLOCK_EMPTY_NUMBER);                   // выключает цифры //
+          object_clock_1.set_cur_number(CLOCK_EMPTY_NUMBER);                   // ↑↑↑ //
         }
       }
     }
@@ -912,8 +1144,8 @@ String SYNCdata;                                 // стринг для полу
 
   void UP_clock_func_part_1()
   {
-    Animation::counter = 0;
     Animation::state = Animation::CLOCK_UP_PART_2;
+    Animation::counter = 0;
   }
 
   void UP_clock_func_part_2()
@@ -933,8 +1165,8 @@ String SYNCdata;                                 // стринг для полу
 
   void DOWN_clock_func_part_1()
   {
-    Animation::counter = Clock_Leds_Amount - 1;
     Animation::state = Animation::CLOCK_DOWN_PART_2;
+    Animation::counter = Clock_Leds_Amount - 1;
   }
 
   void DOWN_clock_func_part_2()
