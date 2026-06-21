@@ -6,7 +6,7 @@
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_016\Common_CODE.cpp"
+#include "A:\1_important\PROJECTS\aCoding\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_017\Common_CODE.cpp"
 
 /// ↓↓↓ Синхронизация ошибок
 
@@ -832,17 +832,33 @@
     }
   }
 /// ↓↓↓ Увлажнитель
+ 
+  const unsigned char HUMIDIFIER_SERVICE_PERIOD = 40; // раз в 40 вызовов увлажнитель принудительно включится чтобы вода не застаивалась
 
   void humidifier()                                // увлажнитель //
   {
-    if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
+    static unsigned char service_counter = 0;
+
+    if(service_counter > HUMIDIFIER_SERVICE_PERIOD) // сброс
     {
-      analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
+      service_counter = 0;
     }
 
-    else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
+    if(service_counter == HUMIDIFIER_SERVICE_PERIOD) // сервисное включение, чтобы вода не застаивалась
     {
-      analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
+      analogWrite(pin_PWM_Humidifier, 127); 
+    }
+    else
+    {
+      if (object_Temp_Humidity_sensor.get_humidity() < (room_humidity_target - room_humidity_range))
+      {
+        analogWrite(pin_PWM_Humidifier, 127);                          // от 0 до 255 // при старте увлажнитель выключен //
+      }
+
+      else if (object_Temp_Humidity_sensor.get_humidity() > (room_humidity_target + room_humidity_range))
+      {
+        analogWrite(pin_PWM_Humidifier, 0);                            // от 0 до 255 // при старте увлажнитель выключен //
+      }
     }
   }
 
@@ -939,18 +955,34 @@
       }
 
     private:
+      static const unsigned char ERRORS_TO_AUTO_RESTART = 4;
+      unsigned char              _errors_counter = 0;
+
       time_t _SCD41_timer_UTC;
       byte _id;
       uint16_t _CO2;                               // текущее показание со2
       uint16_t _co2_high_alert;                    // граница срабатывания оповещения
       uint16_t _altitude;                          // установил высоту над уровонем моря (altitude) 215 метров. По топографической карте моё местоположение - 190 метров + ~25 высота восьмого этажа.
 
+
       void _check_errors()
       {
         if (_CO2 < 200)
         {
+          _errors_counter++;
           send_alert("ERROR уровень со2: " + String(_CO2) + "ppm" + "\n\n\n Если ошибка повторяется - попробуйте перезапуск /35101@" + This_bot_name);
           global_ERROR_flag = true;
+        }
+        else
+        {
+          _errors_counter = 0; // сбрасываем если данные получилось получить
+        }
+
+        if(_errors_counter >= ERRORS_TO_AUTO_RESTART)
+        {
+          send_alert("CO2 sensor automatically restarted after " + String(_errors_counter) + " errors occured...\n");
+          _errors_counter = 0;
+          restart();
         }
       }
 
@@ -1870,7 +1902,7 @@
     scd4x.begin(Wire);                             // инициализация датчика СО2 по шине i2c //
 
     send_reset_info();                             // причина перезагрузки //
-    //send_alert("Я проснулся.");
+    //send_alert("ESP Chat - Я проснулся.");
 
     recuperator_button_check(true);                // текущий режим вентиляции рекуператор или заслонки //
     motor_calibration::state = motor_calibration::quick;     // выставление стейта быстрой калибровки //
