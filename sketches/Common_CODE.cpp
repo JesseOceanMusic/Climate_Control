@@ -507,7 +507,9 @@
       echo_supervision += ":\n\n";
       echo_supervision += input;
       object_array_users[0].send_message(echo_supervision);
-    }  
+    }
+
+    //Serial.println("Sent message to " + String(_id) + ", content: " + input); // это убивает протокол синхронизации данных между есп...
   }
 
   bool class_users::check_id(String CHAT_IDcur, String income_message)
@@ -531,6 +533,8 @@
 
   void send_alert(String input_message)                    // функция для отправки уведомлений пользователям, которые на них подписаны //
   {
+    //Serial.println("Alert added to queue: " + input_message); // это убивает протокол синхронизации данных между есп...
+
     if(global_buf_alert_msg.length() < 800)
     {
       if(global_buf_alert_msg.length() < 2)
@@ -674,10 +678,10 @@
     }
   }
 
-  #define bot_main_poll_period 23000
+  #define bot_main_poll_period 23'000
                             // ↑↑   13/17/23/27/33/37 секунды, чтобы максимально редко было совпадение с моими циклами раз в 60 секунд //
                             // уведомления (send_alert) и дебаг-сообщения отправляются только между этими периодами, то есть раз в 13/17/23 секунды //
-  #define bot_both_time_out 60000
+  #define bot_both_time_out 60'000
           // .setTimeout это не время ожидания ответа от сервера внутри одного .tick //
           // это время ожидания ответа после окончания bot_main_poll_period //
           // то есть, если последнее сообщение было 17 секунд назад (bot_main_poll_period) и плюс прошло еще 8 секунд (bot_both_time_out) //
@@ -715,6 +719,8 @@
 
   void check_timer_for_sending_debug_report();             // прототип функции
 
+  inline constexpr bool ENABLE_TG_TICK = false; 
+
   void bot_tick_and_call_debug()                           // позволяет отправить сообщение без задержки в 1-2 секунды в режиме Long. Проблема есть только если сообщение отправляется вне обработчика входящий сообщений. // https://github.com/GyverLibs/FastBot2/blob/main/docs/3.start.md //
   {
     jesse_yield_func();
@@ -725,11 +731,14 @@
     obj_stopwatch_ms_Telegram_TICK.start();
     if(millis() - timer_for_tick_ms > 5)
     {
-      if(bot_main.tick() == true)
+      if(ENABLE_TG_TICK == true)
       {
-        if(bot_main.isPolling() == false)
+        if(bot_main.tick() == true) // вот этот вызов всё ломает, если тг не работает
         {
-          can_i_send_message_flag = true;
+          if(bot_main.isPolling() == false)
+          {
+            can_i_send_message_flag = true;
+          }
         }
       }
       timer_for_tick_ms = millis();
