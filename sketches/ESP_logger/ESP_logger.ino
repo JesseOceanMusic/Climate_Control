@@ -6,7 +6,7 @@
 #define Jesse_yield_enable                       // delay(0) и yield() одно и тоже... и то и то даёт возможность ESP в эти прерывания обработать wi-fi и внутренний код // https://arduino.stackexchange.com/questions/78590/nodemcu-1-0-resets-automatically-after-sometime //
 
 
-#include "A:\1 - important\PROJECTS\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_016\Common_CODE.cpp"
+#include "A:\1_important\PROJECTS\aCoding\Arduino\!Climate_Control\! GEN 8\Gen_8_ver_017\Common_CODE.cpp"
 
 String SYNCdata;                                 // стринг для полученных данных из Serial Port //
 
@@ -475,7 +475,7 @@ String SYNCdata;                                 // стринг для полу
       {
         if(_NightTimeState <= NightTime::State::NEUTRAL)                       // Ночной режим ВКЛ с 21:00 до 6:48 //
         { 
-          if (object_TimeDate.get_TimeB() > 210000 || object_TimeDate.get_TimeB() < 84800)
+          if (object_TimeDate.get_TimeB() > 20'00'00 || object_TimeDate.get_TimeB() < 10'48'00)
           {
             _NightTimeDimState = NightTime::DimState::DECREASE;     // Уменьшение яркости (займет 10 минут при стандартной яркости) //
             _NightTimeState    = NightTime::State::ON;              // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
@@ -484,7 +484,7 @@ String SYNCdata;                                 // стринг для полу
 
         if(_NightTimeState >= NightTime::State::NEUTRAL)                       // Ночной режим ВЫКЛ c 6:50 до 20:58 // 
         {
-          if (object_TimeDate.get_TimeB() > 85000 && object_TimeDate.get_TimeB() < 205800)
+          if (object_TimeDate.get_TimeB() > 10'50'00 && object_TimeDate.get_TimeB() < 19'58'00)
           {    
             _NightTimeDimState = NightTime::DimState::INCREASE;     // Увеличение яркости (займет 40 минут при стандартной яркости) //
             _NightTimeState    = NightTime::State::OFF;             // 1 - выкл, 2 - вкл до след утра , 3 - в нейтральном положение, чтобы сработало сразу при включение, 4 -вкл , 5 - выкл след вечера //
@@ -1853,7 +1853,7 @@ String SYNCdata;                                 // стринг для полу
     FastLED.setBrightness(255);                                             // задаём глобальную яркость всех лент, как максимальную //
 
     send_reset_info();
-    //send_alert("Я проснулся.");
+    //send_alert("ESP Logger - Я проснулся.");
   }
 
   void loop()                                                      // основной луп //
